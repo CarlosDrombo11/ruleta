@@ -1,0 +1,14 @@
+{
+  "name": "Ruleta de Premios - Sorteo Interactivo",
+  "short_name": "Ruleta Premios",
+  "description": "Aplicación web interactiva para realizar sorteos y rifas con ruleta animada, scroll sincronizado y efectos de audio",
+  "id": "com.tu-dominio.roulette-app",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "landscape-primary",
+  "theme_color": "#3498DB",
+  "background_color": "#ECF0F1",
+  "lang": "es",
+  "dir": "ltr"
+}

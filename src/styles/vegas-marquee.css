@@ -1,0 +1,452 @@
+/* MARQUESINA ESTILO LAS VEGAS */
+
+/* Contenedor principal de la marquesina */
+.main-title.vegas-marquee {
+  position: relative;
+  display: inline-block;
+  padding: 20px 40px;
+  background: linear-gradient(45deg, #1a1a1a, #2d2d2d);
+  border: 6px solid #FFD700;
+  border-radius: 15px;
+  color: #FFFFFF;
+  text-shadow: 
+    0 0 5px #FF0080,
+    0 0 10px #FF0080,
+    0 0 15px #FF0080,
+    0 0 20px #FF0080,
+    0 0 35px #FF0080,
+    0 0 40px #FF0080;
+  animation: vegas-pulse 2s ease-in-out infinite alternate;
+  box-shadow: 
+    0 0 20px #FFD700,
+    inset 0 0 20px rgba(255, 215, 0, 0.1);
+  overflow: visible;
+}
+
+/* Animación principal del texto */
+@keyframes vegas-pulse {
+  0% {
+    text-shadow: 
+      0 0 5px #FF0080,
+      0 0 10px #FF0080,
+      0 0 15px #FF0080,
+      0 0 20px #FF0080;
+    transform: scale(1);
+  }
+  100% {
+    text-shadow: 
+      0 0 10px #00FFFF,
+      0 0 20px #00FFFF,
+      0 0 30px #00FFFF,
+      0 0 40px #00FFFF,
+      0 0 50px #00FFFF;
+    transform: scale(1.02);
+  }
+}
+
+/* Luces parpadeantes alrededor del borde */
+.main-title.vegas-marquee::before {
+  content: '';
+  position: absolute;
+  top: -15px;
+  left: -15px;
+  right: -15px;
+  bottom: -15px;
+  background: transparent;
+  border-radius: 20px;
+  background-image: 
+    radial-gradient(circle at 20% 20%, #FF0080 4px, transparent 4px),
+    radial-gradient(circle at 40% 20%, #00FFFF 4px, transparent 4px),
+    radial-gradient(circle at 60% 20%, #FFFF00 4px, transparent 4px),
+    radial-gradient(circle at 80% 20%, #FF4500 4px, transparent 4px),
+    radial-gradient(circle at 100% 40%, #FF0080 4px, transparent 4px),
+    radial-gradient(circle at 100% 60%, #00FFFF 4px, transparent 4px),
+    radial-gradient(circle at 80% 80%, #FFFF00 4px, transparent 4px),
+    radial-gradient(circle at 60% 80%, #FF4500 4px, transparent 4px),
+    radial-gradient(circle at 40% 80%, #FF0080 4px, transparent 4px),
+    radial-gradient(circle at 20% 80%, #00FFFF 4px, transparent 4px),
+    radial-gradient(circle at 0% 60%, #FFFF00 4px, transparent 4px),
+    radial-gradient(circle at 0% 40%, #FF4500 4px, transparent 4px);
+  background-size: 100% 100%;
+  animation: vegas-bulbs 0.8s linear infinite;
+  z-index: -1;
+}
+
+/* Animación de las bombillas */
+@keyframes vegas-bulbs {
+  0% { opacity: 1; }
+  25% { opacity: 0.3; }
+  50% { opacity: 1; }
+  75% { opacity: 0.6; }
+  100% { opacity: 1; }
+}
+
+/* Luces adicionales que se mueven */
+.main-title.vegas-marquee::after {
+  content: '';
+  position: absolute;
+  top: -20px;
+  left: -20px;
+  right: -20px;
+  bottom: -20px;
+  border-radius: 25px;
+  background: conic-gradient(
+    from 0deg,
+    #FF0080 0deg,
+    #00FFFF 60deg,
+    #FFFF00 120deg,
+    #FF4500 180deg,
+    #FF0080 240deg,
+    #00FFFF 300deg,
+    #FF0080 360deg
+  );
+  animation: vegas-rotate 4s linear infinite;
+  z-index: -2;
+  opacity: 0.3;
+}
+
+@keyframes vegas-rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Efecto de destello */
+.main-title.vegas-marquee .vegas-sparkle {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: #FFFFFF;
+  border-radius: 50%;
+  animation: vegas-sparkle 1.5s ease-in-out infinite;
+  box-shadow: 0 0 10px #FFFFFF;
+}
+
+@keyframes vegas-sparkle {
+  0%, 100% { 
+    opacity: 0; 
+    transform: scale(0); 
+  }
+  50% { 
+    opacity: 1; 
+    transform: scale(1); 
+  }
+}
+
+.vegas-sparkle:nth-child(1) { top: 10%; left: 15%; animation-delay: 0s; }
+.vegas-sparkle:nth-child(2) { top: 20%; right: 15%; animation-delay: 0.3s; }
+.vegas-sparkle:nth-child(3) { bottom: 10%; left: 20%; animation-delay: 0.6s; }
+.vegas-sparkle:nth-child(4) { bottom: 20%; right: 20%; animation-delay: 0.9s; }
+.vegas-sparkle:nth-child(5) { top: 50%; left: 10%; animation-delay: 1.2s; }
+.vegas-sparkle:nth-child(6) { top: 50%; right: 10%; animation-delay: 1.5s; }
+
+/* Versión más intensa para eventos especiales */
+.main-title.vegas-marquee.super-vegas {
+  animation: super-vegas-pulse 1s ease-in-out infinite alternate;
+  border-color: #FF0080;
+}
+
+@keyframes super-vegas-pulse {
+  0% {
+    text-shadow: 
+      0 0 10px #FF0080,
+      0 0 20px #FF0080,
+      0 0 30px #FF0080,
+      0 0 40px #FF0080,
+      0 0 50px #FF0080;
+    box-shadow: 
+      0 0 30px #FF0080,
+      inset 0 0 30px rgba(255, 0, 128, 0.2);
+    transform: scale(1) rotate(0deg);
+  }
+  100% {
+    text-shadow: 
+      0 0 15px #00FFFF,
+      0 0 30px #00FFFF,
+      0 0 45px #00FFFF,
+      0 0 60px #00FFFF,
+      0 0 75px #00FFFF;
+    box-shadow: 
+      0 0 50px #00FFFF,
+      inset 0 0 40px rgba(0, 255, 255, 0.2);
+    transform: scale(1.05) rotate(1deg);
+  }
+}
+
+/* Adaptaciones responsive */
+@media (max-width: 768px) {
+  .main-title.vegas-marquee {
+    padding: 15px 25px;
+    font-size: 2rem;
+  }
+  
+  .main-title.vegas-marquee::before,
+  .main-title.vegas-marquee::after {
+    top: -10px;
+    left: -10px;
+    right: -10px;
+    bottom: -10px;
+  }
+}
+
+@media (max-width: 480px) {
+  .main-title.vegas-marquee {
+    padding: 10px 20px;
+    font-size: 1.5rem;
+  }
+  
+  .vegas-sparkle {
+    width: 6px;
+    height: 6px;
+  }
+}
+
+/* Efecto para cuando alguien gana */
+.main-title.vegas-marquee.winner-celebration {
+  animation: winner-vegas 0.5s ease-in-out infinite alternate;
+}
+
+@keyframes winner-vegas {
+  0% {
+    text-shadow: 
+      0 0 20px #FFD700,
+      0 0 40px #FFD700,
+      0 0 60px #FFD700;
+    border-color: #FFD700;
+    transform: scale(1) rotate(-2deg);
+  }
+  100% {
+    text-shadow: 
+      0 0 30px #FFFFFF,
+      0 0 50px #FFFFFF,
+      0 0 70px #FFFFFF;
+    border-color: #FFFFFF;
+    transform: scale(1.1) rotate(2deg);
+  }
+}
+/* HEADER VEGAS MEJORADO */
+
+/* Fondo del header con efectos Vegas */
+.header.vegas-header {
+  background: linear-gradient(135deg, 
+    #0a0a0a 0%, 
+    #1a1a1a 25%, 
+    #2d1b3d 50%, 
+    #1a1a1a 75%, 
+    #0a0a0a 100%);
+  border-bottom: 3px solid #FFD700;
+  box-shadow: 
+    0 0 20px rgba(255, 215, 0, 0.5),
+    inset 0 0 30px rgba(255, 0, 128, 0.1);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Patrón de diamantes en el fondo */
+.header.vegas-header::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: 
+    radial-gradient(circle at 25% 25%, rgba(255, 215, 0, 0.1) 2px, transparent 2px),
+    radial-gradient(circle at 75% 25%, rgba(255, 0, 128, 0.1) 2px, transparent 2px),
+    radial-gradient(circle at 25% 75%, rgba(0, 255, 255, 0.1) 2px, transparent 2px),
+    radial-gradient(circle at 75% 75%, rgba(255, 255, 0, 0.1) 2px, transparent 2px);
+  background-size: 40px 40px;
+  animation: vegas-pattern 4s linear infinite;
+  opacity: 0.7;
+}
+
+@keyframes vegas-pattern {
+  0% { transform: translateX(0) translateY(0); }
+  100% { transform: translateX(40px) translateY(40px); }
+}
+
+/* Luces laterales del header */
+.header.vegas-header::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: 
+    linear-gradient(90deg, 
+      rgba(255, 0, 128, 0.3) 0%, 
+      transparent 10%, 
+      transparent 90%, 
+      rgba(0, 255, 255, 0.3) 100%);
+  animation: vegas-side-lights 3s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+
+@keyframes vegas-side-lights {
+  0% { opacity: 0.3; }
+  100% { opacity: 0.7; }
+}
+
+/* Mejorar la marquesina para integrarla mejor */
+.main-title.vegas-marquee {
+  position: relative;
+  display: inline-block;
+  padding: 25px 50px;
+  background: linear-gradient(135deg, 
+    #000000 0%, 
+    #1a1a1a 25%, 
+    #2d2d2d 50%, 
+    #1a1a1a 75%, 
+    #000000 100%);
+  border: 4px solid #FFD700;
+  border-radius: 20px;
+  color: #FFFFFF;
+  text-shadow: 
+    0 0 5px #FF0080,
+    0 0 10px #FF0080,
+    0 0 15px #FF0080,
+    0 0 20px #FF0080,
+    0 0 35px #FF0080,
+    0 0 40px #FF0080;
+  animation: vegas-pulse 2s ease-in-out infinite alternate;
+  box-shadow: 
+    0 0 25px #FFD700,
+    inset 0 0 25px rgba(255, 215, 0, 0.1),
+    0 0 50px rgba(255, 0, 128, 0.3);
+  overflow: visible;
+  z-index: 10;
+}
+
+/* Cortina de teatro como fondo */
+.header.vegas-theater {
+  background: 
+    linear-gradient(90deg, 
+      #8B0000 0%, 
+      #DC143C 25%, 
+      #B22222 50%, 
+      #DC143C 75%, 
+      #8B0000 100%);
+  background-size: 100px 100%;
+  animation: theater-curtain 6s ease-in-out infinite;
+  border-bottom: 5px solid #FFD700;
+  box-shadow: 
+    0 0 30px rgba(255, 215, 0, 0.6),
+    inset 0 -5px 15px rgba(0, 0, 0, 0.3);
+}
+
+@keyframes theater-curtain {
+  0%, 100% { background-position: 0% 0%; }
+  50% { background-position: 100% 0%; }
+}
+
+/* Efectos de spotlight */
+.header.vegas-theater::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: 
+    radial-gradient(ellipse 200px 100px at 20% 50%, rgba(255, 255, 255, 0.1) 0%, transparent 50%),
+    radial-gradient(ellipse 200px 100px at 80% 50%, rgba(255, 255, 255, 0.1) 0%, transparent 50%);
+  animation: spotlight 4s ease-in-out infinite alternate;
+}
+
+@keyframes spotlight {
+  0% { opacity: 0.3; }
+  100% { opacity: 0.8; }
+}
+
+/* Casino/Neón style */
+.header.vegas-casino {
+  background: 
+    linear-gradient(45deg, 
+      #000000 0%, 
+      #1a0033 25%, 
+      #330066 50%, 
+      #1a0033 75%, 
+      #000000 100%);
+  border-bottom: 4px solid;
+  border-image: linear-gradient(90deg, 
+    #FF0080, #00FFFF, #FFFF00, #FF4500, #FF0080) 1;
+  box-shadow: 
+    0 0 40px rgba(255, 0, 128, 0.5),
+    inset 0 0 40px rgba(0, 255, 255, 0.1);
+  position: relative;
+}
+
+/* Líneas de neón que se mueven */
+.header.vegas-casino::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, 
+    transparent 0%, 
+    rgba(0, 255, 255, 0.3) 50%, 
+    transparent 100%);
+  animation: neon-sweep 3s ease-in-out infinite;
+}
+
+@keyframes neon-sweep {
+  0% { left: -100%; }
+  100% { left: 100%; }
+}
+
+/* Versión "Art Deco Vegas" */
+.header.vegas-deco {
+  background: 
+    linear-gradient(135deg, 
+      #000000 0%, 
+      #FFD700 3%, 
+      #000000 6%, 
+      #FFD700 9%, 
+      #000000 12%, 
+      #2C1810 50%, 
+      #000000 88%, 
+      #FFD700 91%, 
+      #000000 94%, 
+      #FFD700 97%, 
+      #000000 100%);
+  border-bottom: 6px solid #FFD700;
+  box-shadow: 
+    0 0 25px rgba(255, 215, 0, 0.6),
+    inset 0 0 30px rgba(255, 215, 0, 0.1);
+}
+
+/* Clase para título que se adapta mejor */
+.header.vegas-deco .main-title.vegas-marquee {
+  background: linear-gradient(135deg, 
+    #1a1a1a 0%, 
+    #2d2d2d 50%, 
+    #1a1a1a 100%);
+  border: 3px solid #FFD700;
+  box-shadow: 
+    0 0 20px #FFD700,
+    inset 0 0 20px rgba(255, 215, 0, 0.2);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .main-title.vegas-marquee {
+    padding: 15px 30px;
+    border-radius: 15px;
+  }
+  
+  .header.vegas-header::before,
+  .header.vegas-theater::before,
+  .header.vegas-casino::before {
+    animation-duration: 6s;
+  }
+}
+
+@media (max-width: 480px) {
+  .main-title.vegas-marquee {
+    padding: 10px 20px;
+    border-radius: 12px;
+    border-width: 2px;
+  }
+}
