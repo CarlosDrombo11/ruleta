@@ -155,19 +155,32 @@ export class ExcelParser {
     return result;
   }
 
-  private cleanAndValidateArray(items: string[], type: string): string[] {
-    const cleaned = items
-      .filter(item => item.length > 0)
-      .map(item => item.trim())
-      .filter((item, index, arr) => arr.indexOf(item) === index); // Remover duplicados
+private cleanAndValidateArray(items: string[], type: string): string[] {
+  // Limpieza básica
+  const cleaned = items
+    .map(s => (s ?? '').trim())
+    .filter(s => s.length > 0);
 
-    if (cleaned.length === 0) {
-      throw new Error(`No se encontraron ${type}s válidos`);
-    }
-
-    console.log(`${cleaned.length} ${type}s únicos procesados`);
-    return cleaned;
+  if (type.toLowerCase().includes('participante')) {
+    // Deduplicar SOLO participantes (case-insensitive)
+    const seen = new Set<string>();
+    const unique = cleaned.filter(name => {
+      const key = name.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    if (unique.length === 0) throw new Error('No se encontraron participantes válidos');
+    console.log(`${unique.length} participantes únicos procesados`);
+    return unique;
   }
+
+  // Premios: conservar duplicados (cada fila es una unidad)
+  if (cleaned.length === 0) throw new Error('No se encontraron premios válidos');
+  console.log(`${cleaned.length} premios (incluyendo repetidos) procesados`);
+  return cleaned;
+}
+
 
   private generatePreview(data: ExcelData) {
     return {
