@@ -44,9 +44,17 @@ export class ScrollAnimator {
   private highlightBandEl!: HTMLDivElement;
   private lastPainted: HTMLElement[] = [];
 
-  // Colores de filas
-  private readonly BRAND_A = '#7acb00';
-  private readonly BRAND_B = '#ff0198';
+  // Colores de filas (múltiples colores vibrantes)
+  private readonly BRAND_COLORS = [
+    '#7acb00', // Verde brillante
+    '#ff0198', // Rosa/Magenta
+    '#00bfff', // Azul cielo
+    '#ff6b35', // Naranja
+    '#9b59b6', // Púrpura
+    '#f1c40f', // Amarillo dorado
+    '#e74c3c', // Rojo
+    '#1abc9c', // Turquesa
+  ];
   private readonly ITEM_TEXT_COLOR = '#000';
   private readonly USE_GRADIENT_PER_ITEM = false;
 
@@ -196,7 +204,7 @@ export class ScrollAnimator {
       el.style.cssText = `
         height: ${this.ITEM_HEIGHT}px;
         display:flex; align-items:center; padding:0 20px;
-        background:${this.BRAND_A}; color:${this.ITEM_TEXT_COLOR};
+        background:${this.BRAND_COLORS[0]}; color:${this.ITEM_TEXT_COLOR};
         border-radius:20px; margin:8px 10px; box-sizing:border-box;
       `;
       el.textContent = 'Item';
@@ -267,9 +275,9 @@ export class ScrollAnimator {
     item.className = 'participant-item';
     item.dataset.participantId = participant.id;
 
-    const baseColor = rowIndex % 2 === 0 ? this.BRAND_A : this.BRAND_B;
+    const baseColor = this.BRAND_COLORS[rowIndex % this.BRAND_COLORS.length];
     const bg = this.USE_GRADIENT_PER_ITEM
-      ? `linear-gradient(90deg, ${this.BRAND_A} 0%, ${this.BRAND_B} 100%)`
+      ? `linear-gradient(90deg, ${this.BRAND_COLORS[0]} 0%, ${this.BRAND_COLORS[1]} 100%)`
       : baseColor;
 
     item.style.cssText = `

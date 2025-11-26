@@ -625,15 +625,35 @@ private applyBackground(): void {
           <div class="celebration-prize">🎉 ${this.currentPrize.name} 🎉</div>
           <img class="celebration-image" src="/images/premio-${this.currentPrize.imageIndex}.jpg" alt="${this.currentPrize.name}">
           <div class="celebration-winner">Ganador: ${this.currentWinner.name}</div>
+          <div style="margin-top: 30px;">
+            <p style="font-size: 18px; margin-bottom: 15px; color: #2C3E50;">¿El ganador está presente?</p>
+            <div style="display: flex; gap: 15px; justify-content: center;">
+              <button class="control-button present-btn" style="background: #27ae60; flex: 1;">
+                ✓ Presente
+              </button>
+              <button class="control-button absent-btn" style="background: #e74c3c; flex: 1;">
+                ✗ Ausente
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     `;
     document.body.appendChild(modal);
 
-    setTimeout(() => {
+    // Botón "Presente" - continúa normalmente
+    const presentBtn = modal.querySelector('.present-btn');
+    presentBtn?.addEventListener('click', () => {
       modal.remove();
       this.completeCelebration();
-    }, this.config.timing.celebrationDuration * 1000);
+    });
+
+    // Botón "Ausente" - elimina ganador y vuelve a sortear el premio
+    const absentBtn = modal.querySelector('.absent-btn');
+    absentBtn?.addEventListener('click', () => {
+      modal.remove();
+      this.handleAbsentWinner();
+    });
   }
 
 private completeCelebration(): void {
@@ -652,6 +672,78 @@ private completeCelebration(): void {
   } else {
     this.stateMachine.transition('autoMode');
   }
+}
+
+private handleAbsentWinner(): void {
+  console.log('[FSM] handleAbsentWinner - Ganador ausente, re-sorteando premio');
+
+  // Registrar en el historial de ausentes ANTES de eliminar
+  if (this.currentPrize && this.currentWinner) {
+    Storage.saveAbsentWinner(this.currentPrize, this.currentWinner.name);
+  }
+
+  // Eliminar al ganador ausente de la lista de participantes
+  if (this.currentWinner) {
+    const id = this.currentWinner.id;
+    this.participants = this.participants.filter(p => p.id !== id);
+    this.scrollAnimator.removeParticipantById(id);
+    console.log(`Participante ${this.currentWinner.name} eliminado por ausencia`);
+  }
+
+  // Devolver el premio a la lista para volver a sortearlo
+  if (this.currentPrize) {
+    this.prizes.push(this.currentPrize);
+    console.log(`Premio "${this.currentPrize.name}" devuelto para re-sorteo`);
+  }
+
+  // Limpiar ganador y premio actuales
+  this.currentWinner = null;
+  this.currentPrize = null;
+
+  // Verificar si aún hay participantes
+  if (this.participants.length === 0) {
+    this.stateMachine.setPrizesAvailable(false);
+    this.stateMachine.transition('finished');
+    this.showErrorDialog('No hay más participantes disponibles');
+  } else {
+    // Mostrar notificación y volver a modo automático para re-sortear
+    this.showInfoNotification('El premio será sorteado nuevamente');
+    this.stateMachine.transition('autoMode');
+  }
+}
+
+private showInfoNotification(message: string): void {
+  const notification = document.createElement('div');
+  notification.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: #3498db;
+    color: white;
+    padding: 15px 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    z-index: 10000;
+    max-width: 300px;
+    font-size: 16px;
+    line-height: 1.4;
+    animation: slideIn 0.3s ease;
+  `;
+
+  notification.innerHTML = `
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <span style="font-size: 24px;">ℹ️</span>
+      <div>${message}</div>
+    </div>
+  `;
+
+  document.body.appendChild(notification);
+
+  // Auto-remover después de 3 segundos
+  setTimeout(() => {
+    notification.style.animation = 'slideOut 0.3s ease';
+    setTimeout(() => notification.remove(), 300);
+  }, 3000);
 }
 
 
@@ -1525,9 +1617,18 @@ imagePosition?.addEventListener('change', (e) => {
   private downloadHistory(): void {
     try {
       const history = Storage.loadHistory();
+      const absent = Storage.loadAbsentWinners();
       const title = 'Historial de Sorteos';
 
       const rows = history.map(e => `
+        <tr>
+          <td>${this.escapeHtml(e.prize)}</td>
+          <td>${this.escapeHtml(e.winner)}</td>
+          <td style="white-space:nowrap">${new Date(e.timestamp).toLocaleString()}</td>
+        </tr>
+      `).join('');
+
+      const absentRows = absent.map(e => `
         <tr>
           <td>${this.escapeHtml(e.prize)}</td>
           <td>${this.escapeHtml(e.winner)}</td>
@@ -1544,15 +1645,21 @@ imagePosition?.addEventListener('change', (e) => {
           <style>
             body { font-family: Arial, sans-serif; padding: 24px; color:#222; }
             h1 { margin: 0 0 16px; }
-            table { border-collapse: collapse; width: 100%; }
+            h2 { margin: 32px 0 16px; color: #27ae60; }
+            table { border-collapse: collapse; width: 100%; margin-bottom: 32px; }
             th, td { border: 1px solid #ddd; padding: 8px 10px; }
             th { background:#f5f5f5; text-align: left; }
             tr:nth-child(even){ background:#fafafa; }
+            .absent-section { margin-top: 40px; }
+            .absent-section h2 { color: #e74c3c; }
+            .absent-section table th { background: #ffebee; }
             @media print { body { padding: 0; } }
           </style>
         </head>
         <body>
           <h1>${title}</h1>
+
+          <h2>✓ Premios Entregados</h2>
           ${history.length === 0 ? '<p>No hay entradas en el historial</p>' : `
             <table>
               <thead>
@@ -1561,6 +1668,22 @@ imagePosition?.addEventListener('change', (e) => {
               <tbody>${rows}</tbody>
             </table>
           `}
+
+          ${absent.length > 0 ? `
+            <div class="absent-section">
+              <h2>✗ Ganadores Ausentes (Re-sorteados)</h2>
+              <p style="color: #666; margin-bottom: 16px;">
+                Los siguientes participantes resultaron ganadores pero no estuvieron presentes para reclamar su premio, por lo que fueron re-sorteados.
+              </p>
+              <table>
+                <thead>
+                  <tr><th>Premio</th><th>Participante Ausente</th><th>Fecha</th></tr>
+                </thead>
+                <tbody>${absentRows}</tbody>
+              </table>
+            </div>
+          ` : ''}
+
           <script>
             setTimeout(function(){ window.print(); }, 150);
           </script>

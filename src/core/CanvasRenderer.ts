@@ -281,8 +281,22 @@ export class CanvasRenderer {
 
   private renderPrizeText(centerX: number, centerY: number, radius: number): void {
     this.mainCtx.save();
-    const fontSize = Math.max(16, radius * 0.15);
+
+    // Ancho máximo para el texto (más ancho para permitir más contenido)
+    const maxWidth = radius * 2.2;
+
+    // Primer intento con tamaño grande
+    let fontSize = Math.max(24, radius * 0.45);
     this.mainCtx.font = `bold ${fontSize}px Arial, sans-serif`;
+    let lines = this.wrapText(this.prizeText, maxWidth);
+
+    // Si se necesitan más de 2 líneas, reducir tamaño de fuente para que quepa todo
+    if (lines.length > 2) {
+      fontSize = Math.max(20, radius * 0.35);
+      this.mainCtx.font = `bold ${fontSize}px Arial, sans-serif`;
+      lines = this.wrapText(this.prizeText, maxWidth);
+    }
+
     this.mainCtx.textAlign = 'center';
     this.mainCtx.textBaseline = 'middle';
     this.mainCtx.shadowColor = 'rgba(0, 0, 0, 0.8)';
@@ -290,12 +304,54 @@ export class CanvasRenderer {
     this.mainCtx.shadowOffsetX = 2;
     this.mainCtx.shadowOffsetY = 2;
     this.mainCtx.fillStyle = '#FFFFFF';
-    this.mainCtx.fillText(this.prizeText, centerX, centerY);
+
+    // Calcular posición vertical para centrar múltiples líneas
+    const lineHeight = fontSize * 1.2;
+    const totalHeight = lines.length * lineHeight;
+    const startY = centerY - (totalHeight / 2) + (lineHeight / 2);
+
+    // Dibujar cada línea
+    lines.forEach((line, index) => {
+      const y = startY + (index * lineHeight);
+      this.mainCtx.fillText(line, centerX, y);
+    });
+
     this.mainCtx.shadowColor = 'transparent';
     this.mainCtx.strokeStyle = '#2C3E50';
     this.mainCtx.lineWidth = 2;
-    this.mainCtx.strokeText(this.prizeText, centerX, centerY);
+
+    // Dibujar contorno de cada línea
+    lines.forEach((line, index) => {
+      const y = startY + (index * lineHeight);
+      this.mainCtx.strokeText(line, centerX, y);
+    });
+
     this.mainCtx.restore();
+  }
+
+  private wrapText(text: string, maxWidth: number): string[] {
+    const words = text.split(' ');
+    const lines: string[] = [];
+    let currentLine = '';
+
+    for (const word of words) {
+      const testLine = currentLine ? `${currentLine} ${word}` : word;
+      const metrics = this.mainCtx.measureText(testLine);
+
+      if (metrics.width > maxWidth && currentLine) {
+        lines.push(currentLine);
+        currentLine = word;
+      } else {
+        currentLine = testLine;
+      }
+    }
+
+    if (currentLine) {
+      lines.push(currentLine);
+    }
+
+    // Limitar a máximo 2 líneas
+    return lines.slice(0, 2);
   }
 
   // ==== EASING determinista

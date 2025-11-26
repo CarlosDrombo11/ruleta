@@ -6,6 +6,7 @@ export class Storage {
   private static readonly CONFIG_KEY = 'roulette-config';
   private static readonly DATA_KEY = 'roulette-data';
   private static readonly HISTORY_KEY = 'roulette-history';
+  private static readonly ABSENT_KEY = 'roulette-absent';
   private static readonly VERSION_KEY = 'roulette-version';
   private static readonly CURRENT_VERSION = '1.0.0';
 
@@ -221,6 +222,70 @@ public static loadConfig(): AppConfig {
     }
   }
 
+  // ====== Gestión de ganadores ausentes ======
+  public static saveAbsentWinner(prize: Prize, winner: string): boolean {
+    try {
+      const absent = this.loadAbsentWinners();
+      const entry = {
+        id: Date.now().toString(),
+        prize: prize.name,
+        winner: winner,
+        timestamp: new Date().toISOString(),
+        prizeImage: prize.imageIndex
+      };
+
+      absent.unshift(entry);
+
+      // Mantener solo los últimos 100 registros
+      const trimmedAbsent = absent.slice(0, 100);
+
+      const serialized = JSON.stringify(trimmedAbsent);
+      localStorage.setItem(this.ABSENT_KEY, serialized);
+
+      console.log('Ganador ausente registrado:', entry);
+      return true;
+
+    } catch (error) {
+      console.error('Error guardando ganador ausente:', error);
+      return false;
+    }
+  }
+
+  public static loadAbsentWinners(): Array<{
+    id: string;
+    prize: string;
+    winner: string;
+    timestamp: string;
+    prizeImage: number;
+  }> {
+    try {
+      const saved = localStorage.getItem(this.ABSENT_KEY);
+      if (!saved) {
+        return [];
+      }
+
+      const parsed = JSON.parse(saved);
+      console.log(`Ganadores ausentes cargados: ${parsed.length} entradas`);
+
+      return parsed;
+
+    } catch (error) {
+      console.error('Error cargando ganadores ausentes:', error);
+      return [];
+    }
+  }
+
+  public static clearAbsentWinners(): boolean {
+    try {
+      localStorage.removeItem(this.ABSENT_KEY);
+      console.log('Registro de ausentes limpiado');
+      return true;
+    } catch (error) {
+      console.error('Error limpiando ausentes:', error);
+      return false;
+    }
+  }
+
   public static clearConfig(): boolean {
     try {
       localStorage.removeItem(this.CONFIG_KEY);
@@ -249,6 +314,7 @@ public static loadConfig(): AppConfig {
       localStorage.removeItem(this.CONFIG_KEY);
       localStorage.removeItem(this.DATA_KEY);
       localStorage.removeItem(this.HISTORY_KEY);
+      localStorage.removeItem(this.ABSENT_KEY);
       localStorage.removeItem(this.VERSION_KEY);
       console.log('Todos los datos limpiados');
       return true;
