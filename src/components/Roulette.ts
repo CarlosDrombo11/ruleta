@@ -59,7 +59,7 @@ export class Roulette extends EventEmitter {
   private autoTimer: number | null = null;
   private initialized = false;
 
-  // ====== KEY HANDLER (Alt+C y Alt+I; permite escribir espacios) ======
+  // ====== KEY HANDLER (Alt+C, Alt+I, Alt+P; permite escribir espacios) ======
   private keyHandler = (e: KeyboardEvent) => {
     // Alt + C → abrir/cerrar configuración
     if (e.altKey && e.code === 'KeyC') {
@@ -88,6 +88,24 @@ export class Roulette extends EventEmitter {
       return;
     }
 
+    // Alt + P → pausar/detener modo automático
+    if (e.altKey && e.code === 'KeyP' && !e.ctrlKey && !e.metaKey && !e.repeat) {
+      const active = document.activeElement as HTMLElement | null;
+      const typing =
+        !!active && (
+          active.tagName === 'INPUT' ||
+          active.tagName === 'TEXTAREA' ||
+          active.isContentEditable ||
+          active.getAttribute('contenteditable') === 'true'
+        );
+      if (typing) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+      this.pauseAutoMode();
+      return;
+    }
+
     // Space: permitir escribir en campos; fuera de ellos, no hacer nada
     if (e.code === 'Space') {
       const active = document.activeElement as HTMLElement | null;
@@ -108,6 +126,24 @@ export class Roulette extends EventEmitter {
       return;
     }
   };
+
+  /** Pausa el modo automático */
+  private pauseAutoMode(): void {
+    console.log('[PAUSE] pauseAutoMode');
+    const state = this.stateMachine.getCurrentState();
+
+    // Si está en modo automático, pausar
+    if (state === 'autoMode') {
+      this.clearAutoTimer();
+      this.stateMachine.transition('paused');
+      this.showInfoNotification('Modo automático pausado');
+    }
+    // Si está pausado, reanudar
+    else if (state === 'paused') {
+      this.stateMachine.transition('autoMode');
+      this.showInfoNotification('Modo automático reanudado');
+    }
+  }
 
   /** Arranca/re-normaliza autoMode y lanza el primer giro inmediatamente */
   private startAutoNow(): void {
@@ -457,6 +493,9 @@ private applyBackground(): void {
       imageIndex: (index % 8) + 1
     }));
 
+    // Barajear los premios al inicio para orden aleatorio
+    this.prizes = MathUtils.shuffleArray(this.prizes);
+
     this.usedPrizes = [];
     this.scrollAnimator.setParticipants(this.participants);
 
@@ -548,8 +587,8 @@ private applyBackground(): void {
       }
       this.spinningGuard = true;
 
-      // Elegir premio y ganador
-      this.currentPrize = MathUtils.randomChoice(this.prizes);
+      // Elegir premio (el primero de la lista) y ganador aleatorio
+      this.currentPrize = this.prizes[0]; // Tomar el primero (para re-sorteos prioritarios)
       this.currentWinner = MathUtils.randomChoice(availableParticipants);
       console.log('[SPIN] Selección', {
         prize: this.currentPrize?.name,
@@ -617,43 +656,69 @@ private applyBackground(): void {
     // Efecto Vegas para el ganador (si está activo)
     this.activateWinnerVegasEffect();
 
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay celebration-modal';
-    modal.innerHTML = `
-      <div class="modal">
-        <div class="celebration-content">
-          <div class="celebration-prize">🎉 ${this.currentPrize.name} 🎉</div>
-          <img class="celebration-image" src="/images/premio-${this.currentPrize.imageIndex}.jpg" alt="${this.currentPrize.name}">
-          <div class="celebration-winner">Ganador: ${this.currentWinner.name}</div>
-          <div style="margin-top: 30px;">
-            <p style="font-size: 18px; margin-bottom: 15px; color: #2C3E50;">¿El ganador está presente?</p>
-            <div style="display: flex; gap: 15px; justify-content: center;">
-              <button class="control-button present-btn" style="background: #27ae60; flex: 1;">
-                ✓ Presente
-              </button>
-              <button class="control-button absent-btn" style="background: #e74c3c; flex: 1;">
-                ✗ Ausente
-              </button>
+    // Esperar 2 segundos antes de mostrar el modal
+    setTimeout(() => {
+      const modal = document.createElement('div');
+      modal.className = 'modal-overlay celebration-modal';
+
+      // Modo automático total: mostrar ganador sin pregunta
+      if (this.config.operationMode === 'full-auto') {
+        modal.innerHTML = `
+          <div class="modal">
+            <div class="celebration-content">
+              <div class="celebration-prize">🎉 ${this.currentPrize.name} 🎉</div>
+              <img class="celebration-image" src="/images/premio-${this.currentPrize.imageIndex}.jpg" alt="${this.currentPrize.name}">
+              <div class="celebration-winner">Ganador: ${this.currentWinner.name}</div>
+            </div>
+          </div>
+        `;
+        document.body.appendChild(modal);
+
+        // Auto-cerrar y continuar después del tiempo de celebración
+        setTimeout(() => {
+          modal.remove();
+          this.completeCelebration();
+        }, this.config.timing.celebrationDuration * 1000);
+        return;
+      }
+
+      // Modo semi-automático: mostrar modal con opciones
+      modal.innerHTML = `
+        <div class="modal">
+          <div class="celebration-content">
+            <div class="celebration-prize">🎉 ${this.currentPrize.name} 🎉</div>
+            <img class="celebration-image" src="/images/premio-${this.currentPrize.imageIndex}.jpg" alt="${this.currentPrize.name}">
+            <div class="celebration-winner">Ganador: ${this.currentWinner.name}</div>
+            <div style="margin-top: 30px;">
+              <p style="font-size: 18px; margin-bottom: 15px; color: #2C3E50;">¿El ganador está presente?</p>
+              <div style="display: flex; gap: 15px; justify-content: center;">
+                <button class="control-button present-btn" style="background: #27ae60; flex: 1;">
+                  ✓ Presente
+                </button>
+                <button class="control-button absent-btn" style="background: #e74c3c; flex: 1;">
+                  ✗ Ausente
+                </button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    `;
-    document.body.appendChild(modal);
+      `;
+      document.body.appendChild(modal);
 
-    // Botón "Presente" - continúa normalmente
-    const presentBtn = modal.querySelector('.present-btn');
-    presentBtn?.addEventListener('click', () => {
-      modal.remove();
-      this.completeCelebration();
-    });
+      // Botón "Presente" - continúa normalmente
+      const presentBtn = modal.querySelector('.present-btn');
+      presentBtn?.addEventListener('click', () => {
+        modal.remove();
+        this.completeCelebration();
+      });
 
-    // Botón "Ausente" - elimina ganador y vuelve a sortear el premio
-    const absentBtn = modal.querySelector('.absent-btn');
-    absentBtn?.addEventListener('click', () => {
-      modal.remove();
-      this.handleAbsentWinner();
-    });
+      // Botón "Ausente" - elimina ganador y vuelve a sortear el premio
+      const absentBtn = modal.querySelector('.absent-btn');
+      absentBtn?.addEventListener('click', () => {
+        modal.remove();
+        this.handleAbsentWinner();
+      });
+    }, 2000); // 2 segundos de delay antes de mostrar el modal
   }
 
 private completeCelebration(): void {
@@ -690,10 +755,10 @@ private handleAbsentWinner(): void {
     console.log(`Participante ${this.currentWinner.name} eliminado por ausencia`);
   }
 
-  // Devolver el premio a la lista para volver a sortearlo
+  // Devolver el premio AL INICIO de la lista para que sea el siguiente en sortearse
   if (this.currentPrize) {
-    this.prizes.push(this.currentPrize);
-    console.log(`Premio "${this.currentPrize.name}" devuelto para re-sorteo`);
+    this.prizes.unshift(this.currentPrize); // unshift lo pone al inicio
+    console.log(`Premio "${this.currentPrize.name}" puesto como siguiente a sortear`);
   }
 
   // Limpiar ganador y premio actuales
@@ -838,6 +903,26 @@ private showInfoNotification(message: string): void {
       <div class="config-header">
         <h2 class="config-title">⚙️ Configuración</h2>
         <button class="modal-close" onclick="this.closest('.config-panel').classList.remove('open')">✕</button>
+      </div>
+
+      <!-- Modo de Operación (PRIORITARIO) -->
+      <div class="config-section" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; border-radius: 12px; margin-bottom: 20px;">
+        <h3 class="config-section-title" style="color: white; font-size: 18px; margin-bottom: 15px;">🎯 Modo de Operación (Importante)</h3>
+        <div class="config-group">
+          <label class="config-label" style="color: white; font-weight: bold; margin-bottom: 10px; display: block;">Selecciona el modo de funcionamiento:</label>
+          <select class="config-input" id="operationMode" style="font-size: 16px; padding: 12px;">
+            <option value="semi-auto" ${this.config.operationMode === 'semi-auto' ? 'selected' : ''}>
+              🟡 Semi-automático (Confirmar ganador presente)
+            </option>
+            <option value="full-auto" ${this.config.operationMode === 'full-auto' ? 'selected' : ''}>
+              🟢 Automático Total (Sin interrupciones)
+            </option>
+          </select>
+          <div style="margin-top: 10px; padding: 10px; background: rgba(255,255,255,0.2); border-radius: 8px; color: white; font-size: 14px; line-height: 1.5;">
+            <strong>Semi-automático:</strong> La ruleta se detiene al encontrar ganador y pregunta si está presente.<br>
+            <strong>Automático Total:</strong> La ruleta gira continuamente sin detenerse.
+          </div>
+        </div>
       </div>
 
       <!-- Carga de Datos -->
@@ -1050,6 +1135,14 @@ private showInfoNotification(message: string): void {
     const downloadBtn = this.configPanel.querySelector('#downloadTemplateBtn') as HTMLElement;
     downloadBtn?.addEventListener('click', () => this.downloadTemplate());
 
+    // Modo de operación
+    const operationModeSelect = this.configPanel.querySelector('#operationMode') as HTMLSelectElement;
+    operationModeSelect?.addEventListener('change', (e) => {
+      this.config.operationMode = (e.target as HTMLSelectElement).value as 'semi-auto' | 'full-auto';
+      Storage.saveConfig(this.config);
+      console.log('[CONFIG] Modo de operación cambiado a:', this.config.operationMode);
+    });
+
     // Título
     const titleText = this.configPanel.querySelector('#titleText') as HTMLInputElement;
     titleText?.addEventListener('input', (e) => {
@@ -1227,9 +1320,7 @@ private showInfoNotification(message: string): void {
 
     const stopAutoBtn = this.configPanel.querySelector('#stopAutoBtn') as HTMLElement;
     stopAutoBtn?.addEventListener('click', () => {
-      if (this.stateMachine.getCurrentState() !== 'paused') {
-        this.stateMachine.transition('paused');
-      }
+      this.pauseAutoMode();
     });
 
     const viewHistoryBtn = this.configPanel.querySelector('#viewHistoryBtn') as HTMLElement;

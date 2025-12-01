@@ -88,6 +88,7 @@ export interface AppConfig {
   animations: AnimationConfig;
   mode: 'manual' | 'auto';
   highlightColor: string;
+  operationMode: 'semi-auto' | 'full-auto'; // Modo de operación de la ruleta
 }
 
 export interface Particle {

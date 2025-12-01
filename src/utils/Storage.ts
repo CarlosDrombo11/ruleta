@@ -47,7 +47,8 @@ private static readonly DEFAULT_CONFIG: AppConfig = {
       speed: 1
     },
     mode: 'auto',
-    highlightColor: '#FF6B6B'
+    highlightColor: '#FF6B6B',
+    operationMode: 'semi-auto' // Por defecto modo semi-automático
   };
 
   public static saveConfig(config: AppConfig): boolean {
