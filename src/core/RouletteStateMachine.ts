@@ -35,6 +35,7 @@ export class RouletteStateMachine extends EventEmitter {
         onEnter: () => console.log('Estado: Datos cargados'),
         transitions: {
           autoMode: true,
+          manualMode: true,
           configuring: true,
         },
       },
@@ -42,6 +43,22 @@ export class RouletteStateMachine extends EventEmitter {
         name: 'autoMode',
         onEnter: () => {
           console.log('Estado: Modo automático activado');
+          this.emit('startAutoTimer');
+        },
+        onExit: () => {
+          this.emit('stopAutoTimer');
+        },
+        transitions: {
+          spinning: () => this.autoTimerExpired(),
+          paused: true,
+          finished: () => this.noPrizesLeft(),
+          configuring: true,
+        },
+      },
+      {
+        name: 'manualMode',
+        onEnter: () => {
+          console.log('Estado: Modo semi-automático activado');
           this.emit('startAutoTimer');
         },
         onExit: () => {
@@ -71,7 +88,8 @@ export class RouletteStateMachine extends EventEmitter {
           this.emit('showCelebration');
         },
         transitions: {
-          autoMode: true, // siempre regresar a automático
+          autoMode: true,
+          manualMode: true,
           finished: () => this.noPrizesLeft(),
         },
       },
@@ -83,6 +101,7 @@ export class RouletteStateMachine extends EventEmitter {
         },
         transitions: {
           autoMode: true,
+          manualMode: true,
           configuring: true,
         },
       },

@@ -28,6 +28,7 @@ export interface Participant {
   name: string;
   color: string;
   eliminated: boolean;
+  frozen?: boolean; // Para control remoto: participante congelado no puede salir
 }
 
 export interface Prize {
@@ -35,6 +36,14 @@ export interface Prize {
   name: string;
   imageIndex: number;
   winner?: Participant;
+  frozen?: boolean; // Para control remoto: premio congelado no puede salir
+}
+
+export interface RemoteControl {
+  forcedWinnerId: string | null;
+  forcedPrizeId: string | null;
+  active: boolean;
+  timestamp: number;
 }
 
 export type ParticleType = 'snow' | 'autumn' | 'confetti' | 'bubbles' | 'stars' | 'petals' | 'none';

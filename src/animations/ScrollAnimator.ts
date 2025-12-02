@@ -42,7 +42,6 @@ export class ScrollAnimator {
 
   // Cintillo
   private highlightBandEl!: HTMLDivElement;
-  private lastPainted: HTMLElement[] = [];
 
   // Colores de filas (múltiples colores vibrantes)
   private readonly BRAND_COLORS = [
@@ -243,12 +242,11 @@ export class ScrollAnimator {
     this.copies = Math.max(this.copies, baseCopies);
 
     // 3) pintar filas
-    let rowIndex = 0;
     for (let i = 0; i < this.copies; i++) {
       for (let pIdx = 0; pIdx < this.participants.length; pIdx++) {
         const p = this.participants[pIdx];
-        this.participantsContainer.appendChild(this.createParticipantItem(p, rowIndex));
-        rowIndex++;
+        // Usar pIdx para que cada participante tenga siempre el mismo color
+        this.participantsContainer.appendChild(this.createParticipantItem(p, pIdx));
       }
     }
 
@@ -270,12 +268,12 @@ export class ScrollAnimator {
     this.applyAbsolutePosition(this.absPos);
   }
 
-  private createParticipantItem(participant: Participant, rowIndex: number): HTMLElement {
+  private createParticipantItem(participant: Participant, participantIndex: number): HTMLElement {
     const item = document.createElement('div');
     item.className = 'participant-item';
     item.dataset.participantId = participant.id;
 
-    const baseColor = this.BRAND_COLORS[rowIndex % this.BRAND_COLORS.length];
+    const baseColor = this.BRAND_COLORS[participantIndex % this.BRAND_COLORS.length];
     const bg = this.USE_GRADIENT_PER_ITEM
       ? `linear-gradient(90deg, ${this.BRAND_COLORS[0]} 0%, ${this.BRAND_COLORS[1]} 100%)`
       : baseColor;
@@ -309,32 +307,9 @@ export class ScrollAnimator {
 
   // ---------- Pintado bajo el cintillo ----------
   private paintUnderBand(): void {
-    // Reset de los últimos pintados
-    for (const el of this.lastPainted) {
-      const span = (el.querySelector(':scope > span') as HTMLElement) || el;
-      span.style.removeProperty('color');
-      span.style.textShadow = '0 1px 1px rgba(0,0,0,.35)';
-    }
-    this.lastPainted.length = 0;
-
-    if (!this.participants.length) return;
-
-    const bandCenter = this.getBandCenter(); // sub-píxel real
-    const totalItems = this.copies * this.participants.length;
-
-    const kCenter = Math.round(
-      (this.absPos + bandCenter - this.rowStep / 2) / this.rowStep
-    );
-
-    for (let d = -2; d <= 2; d++) {
-      const k = Math.min(Math.max(kCenter + d, 0), totalItems - 1);
-      const node = this.participantsContainer.children.item(k) as HTMLElement | null;
-      if (!node) continue;
-      const span = (node.querySelector(':scope > span') as HTMLElement) || node;
-      span.style.setProperty('color', this.ITEM_TEXT_COLOR, 'important');
-      span.style.textShadow = 'none';
-      this.lastPainted.push(node);
-    }
+    // Deshabilitado: El cambio de color causaba un "saltito" visual en la animación
+    // Los participantes mantienen su color original para una transición suave
+    return;
   }
 
   // ---------- Sincronización con la ruleta ----------

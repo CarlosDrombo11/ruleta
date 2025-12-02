@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Control Remoto - Ruleta</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      background: #1a1a1a;
+      color: #e0e0e0;
+      padding: 20px;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 10px;
+      font-size: 24px;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    }
+
+    .status {
+      text-align: center;
+      margin-bottom: 20px;
+      padding: 10px;
+      background: #2a2a2a;
+      border-radius: 8px;
+      font-size: 14px;
+      border: 1px solid #3a3a3a;
+    }
+
+    .section {
+      background: #252525;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+      color: #e0e0e0;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+      border: 1px solid #3a3a3a;
+    }
+
+    .section h2 {
+      margin-bottom: 15px;
+      font-size: 18px;
+      color: #a0a0a0;
+      border-bottom: 2px solid #3a3a3a;
+      padding-bottom: 8px;
+    }
+
+    .item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px;
+      margin-bottom: 8px;
+      background: #2a2a2a;
+      border-radius: 8px;
+      border: 2px solid #3a3a3a;
+      transition: all 0.3s ease;
+    }
+
+    .item.frozen {
+      background: #1e3a5f;
+      border-color: #4a90e2;
+    }
+
+    .item-name {
+      flex: 1;
+      font-weight: 500;
+      font-size: 16px;
+    }
+
+    .toggle-btn {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      font-size: 14px;
+    }
+
+    .toggle-btn.freeze {
+      background: #4a90e2;
+      color: white;
+    }
+
+    .toggle-btn.unfreeze {
+      background: #e74c3c;
+      color: white;
+    }
+
+    .toggle-btn:active {
+      transform: scale(0.95);
+    }
+
+    .manual-control {
+      background: #2a2a2a;
+      color: #e0e0e0;
+      padding: 20px;
+      border-radius: 12px;
+      margin-top: 20px;
+      border: 1px solid #3a3a3a;
+    }
+
+    .manual-control h2 {
+      color: #a0a0a0;
+      border-color: #3a3a3a;
+    }
+
+    .select-group {
+      margin-bottom: 15px;
+    }
+
+    .select-group label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    .select-group select {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #3a3a3a;
+      border-radius: 8px;
+      font-size: 16px;
+      background: #1a1a1a;
+      color: #e0e0e0;
+    }
+
+    .send-btn {
+      width: 100%;
+      padding: 16px;
+      border: none;
+      border-radius: 8px;
+      background: #27ae60;
+      color: white;
+      font-size: 18px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    }
+
+    .send-btn:active {
+      transform: scale(0.98);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+
+    .send-btn:disabled {
+      background: #555;
+      cursor: not-allowed;
+    }
+
+    .clear-btn {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #666;
+      border-radius: 8px;
+      background: transparent;
+      color: #e0e0e0;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 10px;
+      transition: all 0.3s ease;
+    }
+
+    .clear-btn:active {
+      background: rgba(255,255,255,0.1);
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 20px;
+      color: #666;
+      font-style: italic;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-left: 8px;
+    }
+
+    .badge.frozen {
+      background: #4a90e2;
+      color: white;
+    }
+
+    .badge.position {
+      background: #666;
+      color: white;
+      font-weight: 700;
+    }
+
+    .search-box {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 10px;
+      border: 2px solid #3a3a3a;
+      border-radius: 8px;
+      font-size: 16px;
+      box-sizing: border-box;
+      background: #1a1a1a;
+      color: #e0e0e0;
+    }
+
+    .search-box:focus {
+      outline: none;
+      border-color: #4a90e2;
+      box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.2);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🎮 Control Remoto</h1>
+    <div class="status" id="status">
+      Cargando datos...
+    </div>
+
+    <div class="section">
+      <h2>👥 Participantes</h2>
+      <input type="text" class="search-box" id="participant-search" placeholder="🔍 Buscar participante...">
+      <div id="participants-list"></div>
+    </div>
+
+    <div class="section">
+      <h2>🎁 Premios</h2>
+      <input type="text" class="search-box" id="prize-search" placeholder="🔍 Buscar premio...">
+      <div id="prizes-list"></div>
+    </div>
+
+    <div class="manual-control">
+      <h2>🎯 Control Manual</h2>
+      <p style="margin-bottom: 15px; font-size: 14px; opacity: 0.9;">
+        Los premios salen en orden (#1, #2, #3...). Selecciona un premio y reserva quién lo ganará cuando llegue su turno. Solo aparecen los congelados. Al enviar se descongelan automáticamente.
+      </p>
+      <div class="select-group">
+        <label>Seleccionar Ganador (Congelados):</label>
+        <select id="winner-select">
+          <option value="">-- Seleccionar --</option>
+        </select>
+      </div>
+      <div class="select-group">
+        <label>Seleccionar Premio (Congelados):</label>
+        <select id="prize-select">
+          <option value="">-- Seleccionar --</option>
+        </select>
+      </div>
+      <button class="send-btn" id="send-btn" disabled>ENVIAR Y DESCONGELAR</button>
+      <button class="clear-btn" id="clear-btn">Limpiar Control</button>
+    </div>
+  </div>
+
+  <script type="module">
+    const PARTICIPANTS_KEY = 'roulette_participants';
+    const PRIZES_KEY = 'roulette_prizes';
+    const REMOTE_CONTROL_KEY = 'roulette_remote_control';
+
+    let participants = [];
+    let prizes = [];
+    let participantSearchTerm = '';
+    let prizeSearchTerm = '';
+
+    // Load data
+    function loadData() {
+      try {
+        const pData = localStorage.getItem(PARTICIPANTS_KEY);
+        const prData = localStorage.getItem(PRIZES_KEY);
+
+        participants = pData ? JSON.parse(pData) : [];
+        prizes = prData ? JSON.parse(prData) : [];
+
+        updateStatus();
+        renderParticipants();
+        renderPrizes();
+        updateSelects();
+      } catch (error) {
+        console.error('Error loading data:', error);
+        document.getElementById('status').textContent = '❌ Error cargando datos';
+      }
+    }
+
+    // Update status
+    function updateStatus() {
+      const available = participants.filter(p => !p.eliminated && !p.frozen).length;
+      const frozen = participants.filter(p => p.frozen).length;
+      const frozenPrizes = prizes.filter(p => p.frozen).length;
+
+      document.getElementById('status').innerHTML = `
+        ✅ ${available} participantes disponibles |
+        ❄️ ${frozen} congelados |
+        🎁 ${frozenPrizes} premios congelados
+      `;
+    }
+
+    // Render participants
+    function renderParticipants() {
+      const container = document.getElementById('participants-list');
+      let activeParticipants = participants.filter(p => !p.eliminated);
+
+      // Aplicar filtro de búsqueda
+      if (participantSearchTerm) {
+        activeParticipants = activeParticipants.filter(p =>
+          p.name.toLowerCase().includes(participantSearchTerm.toLowerCase())
+        );
+      }
+
+      if (activeParticipants.length === 0) {
+        container.innerHTML = '<div class="empty-state">No hay participantes</div>';
+        return;
+      }
+
+      container.innerHTML = activeParticipants.map(p => `
+        <div class="item ${p.frozen ? 'frozen' : ''}">
+          <div class="item-name">
+            ${p.name}
+            ${p.frozen ? '<span class="badge frozen">CONGELADO</span>' : ''}
+          </div>
+          <button class="toggle-btn ${p.frozen ? 'unfreeze' : 'freeze'}"
+                  onclick="window.toggleParticipant('${p.id}')">
+            ${p.frozen ? 'Descongelar' : 'Congelar'}
+          </button>
+        </div>
+      `).join('');
+    }
+
+    // Render prizes
+    function renderPrizes() {
+      const container = document.getElementById('prizes-list');
+      let availablePrizes = prizes.filter(p => !p.winner);
+
+      // Aplicar filtro de búsqueda
+      if (prizeSearchTerm) {
+        availablePrizes = availablePrizes.filter(p =>
+          p.name.toLowerCase().includes(prizeSearchTerm.toLowerCase())
+        );
+      }
+
+      if (availablePrizes.length === 0) {
+        container.innerHTML = '<div class="empty-state">No hay premios disponibles</div>';
+        return;
+      }
+
+      // Calcular posición de cada premio en la lista original (no filtrada)
+      container.innerHTML = availablePrizes.map(p => {
+        const originalPosition = prizes.filter(pr => !pr.winner).indexOf(p) + 1;
+        return `
+          <div class="item ${p.frozen ? 'frozen' : ''}">
+            <div class="item-name">
+              <span class="badge position">#${originalPosition}</span>
+              ${p.name}
+              ${p.frozen ? '<span class="badge frozen">CONGELADO</span>' : ''}
+            </div>
+            <button class="toggle-btn ${p.frozen ? 'unfreeze' : 'freeze'}"
+                    onclick="window.togglePrize('${p.id}')">
+              ${p.frozen ? 'Descongelar' : 'Congelar'}
+            </button>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Update selects
+    function updateSelects() {
+      const winnerSelect = document.getElementById('winner-select');
+      const prizeSelect = document.getElementById('prize-select');
+
+      // SOLO participantes congelados (no eliminados)
+      const frozenParticipants = participants.filter(p => !p.eliminated && p.frozen);
+      winnerSelect.innerHTML = '<option value="">-- Seleccionar --</option>' +
+        frozenParticipants.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+
+      // SOLO premios congelados (sin ganador) - con posición
+      const allAvailablePrizes = prizes.filter(p => !p.winner);
+      const frozenPrizes = prizes.filter(p => !p.winner && p.frozen);
+      prizeSelect.innerHTML = '<option value="">-- Seleccionar --</option>' +
+        frozenPrizes.map(p => {
+          const position = allAvailablePrizes.indexOf(p) + 1;
+          return `<option value="${p.id}">#${position} - ${p.name}</option>`;
+        }).join('');
+
+      updateSendButton();
+    }
+
+    // Update send button
+    function updateSendButton() {
+      const winnerSelect = document.getElementById('winner-select');
+      const prizeSelect = document.getElementById('prize-select');
+      const sendBtn = document.getElementById('send-btn');
+
+      sendBtn.disabled = !winnerSelect.value || !prizeSelect.value;
+    }
+
+    // Toggle participant
+    window.toggleParticipant = function(id) {
+      const participant = participants.find(p => p.id === id);
+      if (participant) {
+        participant.frozen = !participant.frozen;
+        localStorage.setItem(PARTICIPANTS_KEY, JSON.stringify(participants));
+        loadData();
+      }
+    };
+
+    // Toggle prize
+    window.togglePrize = function(id) {
+      const prize = prizes.find(p => p.id === id);
+      if (prize) {
+        prize.frozen = !prize.frozen;
+        localStorage.setItem(PRIZES_KEY, JSON.stringify(prizes));
+        loadData();
+      }
+    };
+
+    // Send control
+    document.getElementById('send-btn').addEventListener('click', () => {
+      const winnerId = document.getElementById('winner-select').value;
+      const prizeId = document.getElementById('prize-select').value;
+
+      if (!winnerId || !prizeId) return;
+
+      // Enviar control remoto PRIMERO (sin descongelar todavía)
+      const control = {
+        forcedWinnerId: winnerId,
+        forcedPrizeId: prizeId,
+        active: true,
+        timestamp: Date.now()
+      };
+
+      localStorage.setItem(REMOTE_CONTROL_KEY, JSON.stringify(control));
+
+      // Descongelar el participante y premio seleccionados
+      const participant = participants.find(p => p.id === winnerId);
+      const prize = prizes.find(p => p.id === prizeId);
+
+      if (participant) {
+        participant.frozen = false;
+      }
+      if (prize) {
+        prize.frozen = false;
+      }
+
+      // Guardar cambios de descongelación
+      localStorage.setItem(PARTICIPANTS_KEY, JSON.stringify(participants));
+      localStorage.setItem(PRIZES_KEY, JSON.stringify(prizes));
+
+      alert('✅ Control enviado!\n\nEl siguiente giro usará el ganador y premio seleccionados.\nSe han descongelado automáticamente.');
+
+      // Recargar para actualizar la UI
+      loadData();
+    });
+
+    // Clear control
+    document.getElementById('clear-btn').addEventListener('click', () => {
+      localStorage.removeItem(REMOTE_CONTROL_KEY);
+      alert('🗑️ Control remoto limpiado');
+    });
+
+    // Listen for changes in selects
+    document.getElementById('winner-select').addEventListener('change', updateSendButton);
+    document.getElementById('prize-select').addEventListener('change', updateSendButton);
+
+    // Listen for search inputs
+    document.getElementById('participant-search').addEventListener('input', (e) => {
+      participantSearchTerm = e.target.value;
+      renderParticipants();
+    });
+
+    document.getElementById('prize-search').addEventListener('input', (e) => {
+      prizeSearchTerm = e.target.value;
+      renderPrizes();
+    });
+
+    // Listen for storage changes (from other tabs)
+    window.addEventListener('storage', (e) => {
+      if (e.key === PARTICIPANTS_KEY || e.key === PRIZES_KEY) {
+        loadData();
+      }
+    });
+
+    // Initial load
+    loadData();
+  </script>
+</body>
+</html>

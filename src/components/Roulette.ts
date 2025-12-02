@@ -8,6 +8,7 @@ import { ExcelParser } from '../core/ExcelParser';
 import { ParticleSystem } from '../animations/ParticleSystem';
 import { ScrollAnimator } from '../animations/ScrollAnimator';
 import { Storage } from '../utils/Storage';
+import { RemoteStorage } from '../utils/RemoteStorage';
 import { MathUtils } from '../utils/MathUtils';
 import { EventEmitter } from '../utils/EventEmitter';
 import {
@@ -127,21 +128,23 @@ export class Roulette extends EventEmitter {
     }
   };
 
-  /** Pausa el modo automático */
+  /** Pausa el modo automático o manual */
   private pauseAutoMode(): void {
     console.log('[PAUSE] pauseAutoMode');
     const state = this.stateMachine.getCurrentState();
 
-    // Si está en modo automático, pausar
-    if (state === 'autoMode') {
+    // Si está en modo automático o manual, pausar
+    if (state === 'autoMode' || state === 'manualMode') {
       this.clearAutoTimer();
       this.stateMachine.transition('paused');
-      this.showInfoNotification('Modo automático pausado');
+      this.showInfoNotification(`${state === 'autoMode' ? 'Modo automático' : 'Modo semi-automático'} pausado - Los datos se mantienen`);
     }
-    // Si está pausado, reanudar
+    // Si está pausado, reanudar al modo anterior
     else if (state === 'paused') {
-      this.stateMachine.transition('autoMode');
-      this.showInfoNotification('Modo automático reanudado');
+      // Reanudar al modo que corresponda según la configuración
+      const targetMode = this.config.operationMode === 'full-auto' ? 'autoMode' : 'manualMode';
+      this.stateMachine.transition(targetMode);
+      this.showInfoNotification(`${targetMode === 'autoMode' ? 'Modo automático' : 'Modo semi-automático'} reanudado`);
     }
   }
 
@@ -434,10 +437,15 @@ private applyBackground(): void {
 
     switch (to) {
       case 'dataLoaded':
-        this.stateMachine.transition('autoMode');
+        // Transicionar al modo correcto según la configuración
+        const targetMode = this.config.operationMode === 'full-auto' ? 'autoMode' : 'manualMode';
+        this.stateMachine.transition(targetMode);
         break;
       case 'autoMode':
         this.setupAutoMode();
+        break;
+      case 'manualMode':
+        this.setupAutoMode(); // Usa la misma lógica de timer
         break;
       case 'finished':
         this.showFinishedDialog();
@@ -450,6 +458,7 @@ private applyBackground(): void {
       idle: 'Esperando datos...',
       dataLoaded: 'Datos cargados',
       autoMode: 'Modo automático',
+      manualMode: 'Modo semi-automático',
       spinning: 'Girando...',
       celebrating: '¡Ganador!',
       paused: 'Pausado',
@@ -484,22 +493,27 @@ private applyBackground(): void {
       id: MathUtils.generateId(),
       name: name.trim(),
       color: MathUtils.generateVibrantColor(),
-      eliminated: false
+      eliminated: false,
+      frozen: false
     }));
 
     this.prizes = data.premios.map((name, index) => ({
       id: MathUtils.generateId(),
       name: name.trim(),
-      imageIndex: (index % 8) + 1
+      imageIndex: (index % 8) + 1,
+      frozen: false
     }));
 
-    // Barajear los premios al inicio para orden aleatorio
-    this.prizes = MathUtils.shuffleArray(this.prizes);
+    // Los premios se mantienen en el orden del Excel (sin barajear)
 
     this.usedPrizes = [];
     this.scrollAnimator.setParticipants(this.participants);
 
     Storage.saveData(data);
+
+    // Guardar en RemoteStorage para sincronización
+    RemoteStorage.saveParticipants(this.participants);
+    RemoteStorage.savePrizes(this.prizes);
 
     this.stateMachine.setDataLoaded(true);
     this.stateMachine.setPrizesAvailable(this.prizes.length > 0);
@@ -587,14 +601,45 @@ private applyBackground(): void {
       }
       this.spinningGuard = true;
 
-      // Elegir premio y ganador COMPLETAMENTE aleatorio
-      const randomPrizeIndex = Math.floor(Math.random() * this.prizes.length);
-      this.currentPrize = this.prizes[randomPrizeIndex];
-      this.currentWinner = MathUtils.randomChoice(availableParticipants);
-      console.log('[SPIN] Selección', {
-        prize: this.currentPrize?.name,
-        winner: this.currentWinner?.name
-      });
+      // MODO SECUENCIAL: Siempre seleccionar el primer premio disponible (orden Excel)
+      const availableToSelect = availableParticipants.filter(p => !p.frozen);
+      const availablePrizes = this.prizes.filter(p => !p.frozen);
+
+      if (availableToSelect.length === 0 || availablePrizes.length === 0) {
+        console.error('[SPIN] No hay participantes/premios disponibles (todos congelados)');
+        this.spinningGuard = false;
+        return;
+      }
+
+      // Seleccionar el siguiente premio en orden
+      this.currentPrize = availablePrizes[0]; // Primer premio disponible (orden Excel)
+
+      // Verificar si hay control remoto para ESTE premio específico
+      const remoteControl = RemoteStorage.getRemoteControl();
+      if (remoteControl && remoteControl.active && remoteControl.forcedPrizeId === this.currentPrize.id) {
+        // CONTROL REMOTO: Este premio tiene un ganador reservado
+        const forcedWinner = this.participants.find(p => p.id === remoteControl.forcedWinnerId);
+
+        if (forcedWinner && !forcedWinner.eliminated && !forcedWinner.frozen) {
+          this.currentWinner = forcedWinner;
+          console.log('[SPIN] ⭐ CONTROL REMOTO - Ganador reservado para este premio', {
+            prize: this.currentPrize?.name,
+            winner: this.currentWinner?.name
+          });
+          // Limpiar el control remoto después de usarlo
+          RemoteStorage.clearRemoteControl();
+        } else {
+          console.warn('[SPIN] Ganador reservado no válido, seleccionando aleatorio');
+          this.currentWinner = MathUtils.randomChoice(availableToSelect);
+        }
+      } else {
+        // Selección normal: ganador aleatorio
+        this.currentWinner = MathUtils.randomChoice(availableToSelect);
+        console.log('[SPIN] Selección secuencial', {
+          prize: this.currentPrize?.name,
+          winner: this.currentWinner?.name
+        });
+      }
 
       // Mostrar premio en el centro
       this.canvasRenderer.setPrize(this.currentPrize.name, this.currentPrize.imageIndex);
@@ -737,7 +782,9 @@ private completeCelebration(): void {
     this.stateMachine.setPrizesAvailable(false);
     this.stateMachine.transition('finished');
   } else {
-    this.stateMachine.transition('autoMode');
+    // Regresar al modo correcto según la configuración
+    const targetMode = this.config.operationMode === 'full-auto' ? 'autoMode' : 'manualMode';
+    this.stateMachine.transition(targetMode);
   }
 }
 
@@ -773,9 +820,10 @@ private handleAbsentWinner(): void {
     this.stateMachine.transition('finished');
     this.showErrorDialog('No hay más participantes disponibles');
   } else {
-    // Mostrar notificación y volver a modo automático para re-sortear
+    // Mostrar notificación y volver al modo correcto para re-sortear
     this.showInfoNotification('El premio será sorteado nuevamente');
-    this.stateMachine.transition('autoMode');
+    const targetMode = this.config.operationMode === 'full-auto' ? 'autoMode' : 'manualMode';
+    this.stateMachine.transition(targetMode);
   }
 }
 
