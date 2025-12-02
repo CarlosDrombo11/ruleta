@@ -1129,8 +1129,8 @@ private showInfoNotification(message: string): void {
           <input type="range" class="config-range" id="spinDuration" min="3" max="10" value="${this.config.timing.spinDuration}">
           <span id="durationValue">${this.config.timing.spinDuration}s</span>
 
-          <label class="config-label">Tiempo entre sorteos automáticos (5-60 seg)</label>
-          <input type="range" class="config-range" id="autoInterval" min="5" max="60" value="${this.config.timing.autoInterval}">
+          <label class="config-label">Tiempo entre sorteos automáticos (2-60 seg)</label>
+          <input type="range" class="config-range" id="autoInterval" min="2" max="60" value="${this.config.timing.autoInterval}">
           <span id="intervalValue">${this.config.timing.autoInterval}s</span>
         </div>
       </div>
