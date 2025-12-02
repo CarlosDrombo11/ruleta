@@ -270,7 +270,32 @@
     </div>
   </div>
 
+  <!-- Firebase SDK -->
   <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+    import { getDatabase, ref, set, onValue, remove } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
+
+    // Configuración de Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyBu3FjGX42LsZRoHE_6cUoyHCMsUNc1Yh8",
+      authDomain: "ruleta-a9643.firebaseapp.com",
+      databaseURL: "https://ruleta-a9643-default-rtdb.firebaseio.com",
+      projectId: "ruleta-a9643",
+      storageBucket: "ruleta-a9643.firebasestorage.app",
+      messagingSenderId: "859095891871",
+      appId: "1:859095891871:web:71e856590b3b0c3f6107aa"
+    };
+
+    // Inicializar Firebase
+    const app = initializeApp(firebaseConfig);
+    const database = getDatabase(app);
+
+    // Referencias a Firebase
+    const PARTICIPANTS_PATH = 'roulette/participants';
+    const PRIZES_PATH = 'roulette/prizes';
+    const REMOTE_CONTROL_PATH = 'roulette/remote_control';
+
+    // Fallback a localStorage
     const PARTICIPANTS_KEY = 'roulette_participants';
     const PRIZES_KEY = 'roulette_prizes';
     const REMOTE_CONTROL_KEY = 'roulette_remote_control';
@@ -280,7 +305,36 @@
     let participantSearchTerm = '';
     let prizeSearchTerm = '';
 
-    // Load data
+    // Escuchar cambios en tiempo real de Firebase
+    function setupFirebaseListeners() {
+      // Escuchar cambios en participantes
+      onValue(ref(database, PARTICIPANTS_PATH), (snapshot) => {
+        if (snapshot.exists()) {
+          participants = snapshot.val();
+          localStorage.setItem(PARTICIPANTS_KEY, JSON.stringify(participants));
+          updateStatus();
+          renderParticipants();
+          updateSelects();
+        }
+      }, (error) => {
+        console.error('Error listening to participants:', error);
+      });
+
+      // Escuchar cambios en premios
+      onValue(ref(database, PRIZES_PATH), (snapshot) => {
+        if (snapshot.exists()) {
+          prizes = snapshot.val();
+          localStorage.setItem(PRIZES_KEY, JSON.stringify(prizes));
+          updateStatus();
+          renderPrizes();
+          updateSelects();
+        }
+      }, (error) => {
+        console.error('Error listening to prizes:', error);
+      });
+    }
+
+    // Load data (fallback a localStorage)
     function loadData() {
       try {
         const pData = localStorage.getItem(PARTICIPANTS_KEY);
@@ -411,27 +465,41 @@
     }
 
     // Toggle participant
-    window.toggleParticipant = function(id) {
+    window.toggleParticipant = async function(id) {
       const participant = participants.find(p => p.id === id);
       if (participant) {
         participant.frozen = !participant.frozen;
+        // Guardar en localStorage (inmediato)
         localStorage.setItem(PARTICIPANTS_KEY, JSON.stringify(participants));
+        // Guardar en Firebase (sincronización)
+        try {
+          await set(ref(database, PARTICIPANTS_PATH), participants);
+        } catch (error) {
+          console.error('Error updating participant in Firebase:', error);
+        }
         loadData();
       }
     };
 
     // Toggle prize
-    window.togglePrize = function(id) {
+    window.togglePrize = async function(id) {
       const prize = prizes.find(p => p.id === id);
       if (prize) {
         prize.frozen = !prize.frozen;
+        // Guardar en localStorage (inmediato)
         localStorage.setItem(PRIZES_KEY, JSON.stringify(prizes));
+        // Guardar en Firebase (sincronización)
+        try {
+          await set(ref(database, PRIZES_PATH), prizes);
+        } catch (error) {
+          console.error('Error updating prize in Firebase:', error);
+        }
         loadData();
       }
     };
 
     // Send control
-    document.getElementById('send-btn').addEventListener('click', () => {
+    document.getElementById('send-btn').addEventListener('click', async () => {
       const winnerId = document.getElementById('winner-select').value;
       const prizeId = document.getElementById('prize-select').value;
 
@@ -445,7 +513,15 @@
         timestamp: Date.now()
       };
 
+      // Guardar en localStorage (inmediato)
       localStorage.setItem(REMOTE_CONTROL_KEY, JSON.stringify(control));
+
+      // Guardar en Firebase (sincronización)
+      try {
+        await set(ref(database, REMOTE_CONTROL_PATH), control);
+      } catch (error) {
+        console.error('Error setting remote control in Firebase:', error);
+      }
 
       // Descongelar el participante y premio seleccionados
       const participant = participants.find(p => p.id === winnerId);
@@ -458,9 +534,17 @@
         prize.frozen = false;
       }
 
-      // Guardar cambios de descongelación
+      // Guardar cambios de descongelación en localStorage
       localStorage.setItem(PARTICIPANTS_KEY, JSON.stringify(participants));
       localStorage.setItem(PRIZES_KEY, JSON.stringify(prizes));
+
+      // Guardar cambios en Firebase
+      try {
+        await set(ref(database, PARTICIPANTS_PATH), participants);
+        await set(ref(database, PRIZES_PATH), prizes);
+      } catch (error) {
+        console.error('Error saving to Firebase:', error);
+      }
 
       alert('✅ Control enviado!\n\nEl siguiente giro usará el ganador y premio seleccionados.\nSe han descongelado automáticamente.');
 
@@ -469,8 +553,17 @@
     });
 
     // Clear control
-    document.getElementById('clear-btn').addEventListener('click', () => {
+    document.getElementById('clear-btn').addEventListener('click', async () => {
+      // Limpiar localStorage
       localStorage.removeItem(REMOTE_CONTROL_KEY);
+
+      // Limpiar Firebase
+      try {
+        await remove(ref(database, REMOTE_CONTROL_PATH));
+      } catch (error) {
+        console.error('Error clearing remote control in Firebase:', error);
+      }
+
       alert('🗑️ Control remoto limpiado');
     });
 
@@ -489,15 +582,18 @@
       renderPrizes();
     });
 
-    // Listen for storage changes (from other tabs)
+    // Listen for storage changes (from other tabs) - fallback
     window.addEventListener('storage', (e) => {
       if (e.key === PARTICIPANTS_KEY || e.key === PRIZES_KEY) {
         loadData();
       }
     });
 
-    // Initial load
+    // Initial load from localStorage (fallback)
     loadData();
+
+    // Setup Firebase real-time listeners (sincronización multi-dispositivo)
+    setupFirebaseListeners();
   </script>
 </body>
 </html>

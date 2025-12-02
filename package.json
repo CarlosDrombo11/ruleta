@@ -11,6 +11,7 @@
     "deploy:channel": "vite build && firebase hosting:channel:deploy preview"
   },
   "dependencies": {
+    "firebase": "^12.6.0",
     "popmotion": "^11.0.5",
     "xlsx": "^0.18.5"
   },
