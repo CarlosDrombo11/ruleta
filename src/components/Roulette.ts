@@ -804,10 +804,10 @@ private handleAbsentWinner(): void {
     console.log(`Participante ${this.currentWinner.name} eliminado por ausencia`);
   }
 
-  // Devolver el premio a la lista (en una posición aleatoria para mantener aleatoriedad)
+  // Devolver el premio al inicio de la lista para que sea el siguiente en orden secuencial
   if (this.currentPrize) {
-    this.prizes.push(this.currentPrize); // Agregar de vuelta a la lista
-    console.log(`Premio "${this.currentPrize.name}" devuelto para re-sorteo aleatorio`);
+    this.prizes.unshift(this.currentPrize); // Agregar al inicio para que sea el siguiente
+    console.log(`Premio "${this.currentPrize.name}" devuelto como siguiente en la secuencia`);
   }
 
   // Limpiar ganador y premio actuales
