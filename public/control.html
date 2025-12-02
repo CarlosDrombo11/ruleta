@@ -505,7 +505,7 @@
 
       if (!winnerId || !prizeId) return;
 
-      // Enviar control remoto PRIMERO (sin descongelar todavía)
+      // Enviar control remoto
       const control = {
         forcedWinnerId: winnerId,
         forcedPrizeId: prizeId,
@@ -523,30 +523,7 @@
         console.error('Error setting remote control in Firebase:', error);
       }
 
-      // Descongelar el participante y premio seleccionados
-      const participant = participants.find(p => p.id === winnerId);
-      const prize = prizes.find(p => p.id === prizeId);
-
-      if (participant) {
-        participant.frozen = false;
-      }
-      if (prize) {
-        prize.frozen = false;
-      }
-
-      // Guardar cambios de descongelación en localStorage
-      localStorage.setItem(PARTICIPANTS_KEY, JSON.stringify(participants));
-      localStorage.setItem(PRIZES_KEY, JSON.stringify(prizes));
-
-      // Guardar cambios en Firebase
-      try {
-        await set(ref(database, PARTICIPANTS_PATH), participants);
-        await set(ref(database, PRIZES_PATH), prizes);
-      } catch (error) {
-        console.error('Error saving to Firebase:', error);
-      }
-
-      alert('✅ Control enviado!\n\nEl siguiente giro usará el ganador y premio seleccionados.\nSe han descongelado automáticamente.');
+      alert('✅ Control enviado!\n\nEl siguiente giro usará el ganador y premio seleccionados.\nIMPORTANTE: Mantén congelados el participante y premio hasta que sean usados.');
 
       // Recargar para actualizar la UI
       loadData();

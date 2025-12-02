@@ -332,6 +332,36 @@ export class Roulette extends EventEmitter {
       const excelFile = files.find(f => this.excelParser.validateFileType(f));
       if (excelFile) this.loadExcelFile(excelFile);
     });
+
+    // ✅ FIREBASE: Escuchar cambios en tiempo real de participantes
+    RemoteStorage.onParticipantsChange((updatedParticipants) => {
+      console.log('[FIREBASE] Participantes actualizados desde Firebase', updatedParticipants.length);
+      this.participants = updatedParticipants;
+      // Actualizar la UI del scroll animator si ya está inicializado
+      if (this.participants.length > 0 && this.scrollAnimator) {
+        this.scrollAnimator.setParticipants(this.participants);
+      }
+    });
+
+    // ✅ FIREBASE: Escuchar cambios en tiempo real de premios
+    RemoteStorage.onPrizesChange((updatedPrizes) => {
+      console.log('[FIREBASE] Premios actualizados desde Firebase', updatedPrizes.length);
+      this.prizes = updatedPrizes;
+      // Actualizar el estado de la máquina si hay/no premios
+      const prizesAvailable = updatedPrizes.filter(p => !p.winner).length > 0;
+      this.stateMachine.setPrizesAvailable(prizesAvailable);
+    });
+
+    // ✅ FIREBASE: Escuchar cambios en el control remoto
+    RemoteStorage.onRemoteControlChange((control) => {
+      if (control && control.active) {
+        console.log('[FIREBASE] Control remoto detectado desde Firebase', control);
+      } else {
+        console.log('[FIREBASE] Control remoto limpiado desde Firebase');
+      }
+    });
+
+    console.log('[FIREBASE] Listeners en tiempo real configurados');
   }
 
   private applyConfiguration(): void {
@@ -601,44 +631,119 @@ private applyBackground(): void {
       }
       this.spinningGuard = true;
 
-      // MODO SECUENCIAL: Siempre seleccionar el primer premio disponible (orden Excel)
-      const availableToSelect = availableParticipants.filter(p => !p.frozen);
-      const availablePrizes = this.prizes.filter(p => !p.frozen);
+      // MODO SECUENCIAL: Seleccionar premio y ganador respetando orden y control remoto
 
-      if (availableToSelect.length === 0 || availablePrizes.length === 0) {
-        console.error('[SPIN] No hay participantes/premios disponibles (todos congelados)');
+      // Participantes disponibles: NO congelados y NO eliminados
+      const availableToSelect = availableParticipants.filter(p => !p.frozen);
+
+      if (availableToSelect.length === 0) {
+        console.error('[SPIN] No hay participantes disponibles (todos congelados o eliminados)');
         this.spinningGuard = false;
         return;
       }
 
-      // Seleccionar el siguiente premio en orden
-      this.currentPrize = availablePrizes[0]; // Primer premio disponible (orden Excel)
+      // ✅ PASO 1: Obtener el siguiente premio en orden (el primero sin ganador)
+      // Incluimos congelados para verificar si tienen control remoto
+      const nextPrizeInOrder = this.prizes[0];
 
-      // Verificar si hay control remoto para ESTE premio específico
+      if (!nextPrizeInOrder) {
+        console.error('[SPIN] No hay premios disponibles');
+        this.spinningGuard = false;
+        return;
+      }
+
+      // ✅ PASO 2: Verificar si este premio está congelado
       const remoteControl = RemoteStorage.getRemoteControl();
-      if (remoteControl && remoteControl.active && remoteControl.forcedPrizeId === this.currentPrize.id) {
-        // CONTROL REMOTO: Este premio tiene un ganador reservado
-        const forcedWinner = this.participants.find(p => p.id === remoteControl.forcedWinnerId);
 
-        if (forcedWinner && !forcedWinner.eliminated && !forcedWinner.frozen) {
-          this.currentWinner = forcedWinner;
-          console.log('[SPIN] ⭐ CONTROL REMOTO - Ganador reservado para este premio', {
-            prize: this.currentPrize?.name,
-            winner: this.currentWinner?.name
-          });
-          // Limpiar el control remoto después de usarlo
-          RemoteStorage.clearRemoteControl();
+      if (nextPrizeInOrder.frozen) {
+        // El premio está congelado - solo proceder si tiene control remoto
+        if (remoteControl && remoteControl.active && remoteControl.forcedPrizeId === nextPrizeInOrder.id) {
+          // ⭐ Este premio congelado tiene control remoto - PROCEDER
+          this.currentPrize = nextPrizeInOrder;
+          const forcedWinner = this.participants.find(p => p.id === remoteControl.forcedWinnerId);
+
+          if (forcedWinner && !forcedWinner.eliminated) {
+            this.currentWinner = forcedWinner;
+
+            console.log('[SPIN] ⭐ CONTROL REMOTO APLICADO - Premio congelado con ganador reservado', {
+              prize: this.currentPrize.name,
+              winner: this.currentWinner.name,
+              prizeWasFrozen: true,
+              winnerWasFrozen: forcedWinner.frozen || false
+            });
+
+            // Descongelar ambos
+            this.currentPrize.frozen = false;
+            RemoteStorage.savePrizes(this.prizes);
+
+            if (forcedWinner.frozen) {
+              forcedWinner.frozen = false;
+              RemoteStorage.saveParticipants(this.participants);
+            }
+
+            // Limpiar el control remoto
+            RemoteStorage.clearRemoteControl();
+          } else {
+            console.error('[SPIN] Premio congelado pero ganador reservado inválido - abortando');
+            this.spinningGuard = false;
+            return;
+          }
         } else {
-          console.warn('[SPIN] Ganador reservado no válido, seleccionando aleatorio');
-          this.currentWinner = MathUtils.randomChoice(availableToSelect);
+          // Premio congelado SIN control remoto - NO se puede sortear
+          console.warn('[SPIN] ⏸️ El siguiente premio está congelado sin control remoto - esperando control', {
+            prize: nextPrizeInOrder.name,
+            frozen: true,
+            hasRemoteControl: false
+          });
+          this.spinningGuard = false;
+          return;
         }
       } else {
-        // Selección normal: ganador aleatorio
-        this.currentWinner = MathUtils.randomChoice(availableToSelect);
-        console.log('[SPIN] Selección secuencial', {
-          prize: this.currentPrize?.name,
-          winner: this.currentWinner?.name
-        });
+        // ✅ PASO 3: Premio NO congelado - proceder normalmente
+        this.currentPrize = nextPrizeInOrder;
+
+        // Verificar si tiene control remoto (aunque no esté congelado)
+        if (remoteControl && remoteControl.active && remoteControl.forcedPrizeId === this.currentPrize.id) {
+          // Este premio tiene ganador reservado
+          const forcedWinner = this.participants.find(p => p.id === remoteControl.forcedWinnerId);
+
+          if (forcedWinner && !forcedWinner.eliminated) {
+            this.currentWinner = forcedWinner;
+
+            console.log('[SPIN] ⭐ CONTROL REMOTO APLICADO - Premio con ganador reservado', {
+              prize: this.currentPrize.name,
+              winner: this.currentWinner.name,
+              winnerWasFrozen: forcedWinner.frozen || false
+            });
+
+            // Descongelar participante si estaba congelado
+            if (forcedWinner.frozen) {
+              forcedWinner.frozen = false;
+              RemoteStorage.saveParticipants(this.participants);
+            }
+
+            // Limpiar el control remoto
+            RemoteStorage.clearRemoteControl();
+          } else {
+            console.warn('[SPIN] Ganador reservado inválido, usando aleatorio');
+            this.currentWinner = MathUtils.randomChoice(availableToSelect);
+          }
+        } else {
+          // Sin control remoto - ganador aleatorio
+          this.currentWinner = MathUtils.randomChoice(availableToSelect);
+
+          if (remoteControl && remoteControl.active) {
+            console.log('[SPIN] 🕒 Control remoto existe pero es para otro premio', {
+              currentPrize: this.currentPrize.name,
+              reservedPrizeId: remoteControl.forcedPrizeId
+            });
+          } else {
+            console.log('[SPIN] Selección normal (sin control remoto)', {
+              prize: this.currentPrize.name,
+              winner: this.currentWinner.name
+            });
+          }
+        }
       }
 
       // Mostrar premio en el centro
