@@ -104,7 +104,7 @@ export class ScrollAnimator {
       box-shadow: none;
       box-sizing: border-box; /* para que el borde no desplace el centro */
     `;
-    band.style.border = `${this.BAND_BORDER_PX}px solid ${this.darken(this.highlightColor, 0.28)}`;
+    band.style.border = `${this.BAND_BORDER_PX}px solid transparent`; // Borde transparente
 
     if (getComputedStyle(this.scrollElement).position === 'static') {
       this.scrollElement.style.position = 'relative';
@@ -118,7 +118,7 @@ export class ScrollAnimator {
     if (this.highlightBandEl) {
       this.highlightBandEl.style.background = 'transparent';
       this.highlightBandEl.style.boxShadow = 'none';
-      this.highlightBandEl.style.border = `${this.BAND_BORDER_PX}px solid ${this.darken(color, 0.28)}`;
+      this.highlightBandEl.style.border = `${this.BAND_BORDER_PX}px solid transparent`; // Borde transparente
       this.syncBandToItemShape();
     }
   }
@@ -416,34 +416,9 @@ export class ScrollAnimator {
   }
 
   private highlightWinner(): void {
-    if (!this.winner) return;
-    const nodes = this.participantsContainer.querySelectorAll(
-      `[data-participant-id="${this.winner.id}"]`
-    );
-    nodes.forEach(el => {
-      (el as HTMLElement).style.cssText += `
-        background: linear-gradient(45deg, ${this.winner!.color}, #FFD700) !important;
-        box-shadow: 0 0 20px rgba(255,215,0,.8);
-        z-index: 15;
-        border: 3px solid #FFD700;
-      `;
-      (el as HTMLElement).style.animation = 'winnerPulse 2s ease-in-out infinite';
-    });
-    this.injectWinnerKeyframes();
-  }
-
-  private injectWinnerKeyframes(): void {
-    const id = 'winner-pulse-animation';
-    if (document.getElementById(id)) return;
-    const style = document.createElement('style');
-    style.id = id;
-    style.textContent = `
-      @keyframes winnerPulse {
-        0%,100% { transform: scale(1); opacity:1; }
-        50% { transform: scale(1.05); opacity:.9; }
-      }
-    `;
-    document.head.appendChild(style);
+    // Deshabilitado: El cambio de estilo causaba un "saltito" en la animación
+    // El ganador mantiene su color original para una transición suave
+    return;
   }
 
   // ---------- API ----------
@@ -484,8 +459,6 @@ export class ScrollAnimator {
   public destroy(): void {
     this.stopAnimation();
     if (this.highlightBandEl) this.highlightBandEl.remove();
-    const style = document.getElementById('winner-pulse-animation');
-    if (style) style.remove();
     this.participantsContainer.remove();
   }
 }

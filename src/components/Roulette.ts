@@ -587,8 +587,9 @@ private applyBackground(): void {
       }
       this.spinningGuard = true;
 
-      // Elegir premio (el primero de la lista) y ganador aleatorio
-      this.currentPrize = this.prizes[0]; // Tomar el primero (para re-sorteos prioritarios)
+      // Elegir premio y ganador COMPLETAMENTE aleatorio
+      const randomPrizeIndex = Math.floor(Math.random() * this.prizes.length);
+      this.currentPrize = this.prizes[randomPrizeIndex];
       this.currentWinner = MathUtils.randomChoice(availableParticipants);
       console.log('[SPIN] Selección', {
         prize: this.currentPrize?.name,
@@ -603,16 +604,17 @@ private applyBackground(): void {
       const winnerIndex = this.participants.findIndex(p => p.id === this.currentWinner!.id);
       if (winnerIndex < 0) throw new Error('Ganador no encontrado en la lista de participantes');
 
-      const winnerOffset = MathUtils.calculateRouletteRotation(
-        winnerIndex,
-        this.participants.length // seguimos usando la lista completa para consistencia visual del giro
-      );
-
       const spins = 6;
       const current = this.canvasRenderer.getCurrentRotation();
-      const target = current + spins * Math.PI * 2 + winnerOffset;
 
-      console.log('[SPIN] target', { current, winnerIndex, winnerOffset, spins, target, duration });
+      // Offset COMPLETAMENTE ALEATORIO - cada giro termina en un lugar diferente
+      // No depende del índice del ganador, es 100% aleatorio
+      const randomOffset = Math.random() * 2 * Math.PI; // Entre 0 y 360 grados (una vuelta completa)
+
+      // Calcular el target: desde la posición actual + vueltas completas + offset aleatorio
+      const target = current + spins * Math.PI * 2 + randomOffset;
+
+      console.log('[SPIN] target', { current, winnerIndex, randomOffset, spins, target, duration });
 
       // Lanzar en paralelo
       const audioPromise = this.audioEngine.createSpinSound(this.config.audio.type, duration);
@@ -629,7 +631,7 @@ private applyBackground(): void {
       // Celebración
       this.audioEngine.playCelebrationSound();
 
-      // Actualizar datos (marcamos eliminado, pero NO re-renderizamos aún el listón)
+      // Actualizar datos: remover el premio sorteado de la lista
       this.usedPrizes.push(this.currentPrize);
       this.prizes = this.prizes.filter(p => p.id !== this.currentPrize!.id);
 
@@ -755,10 +757,10 @@ private handleAbsentWinner(): void {
     console.log(`Participante ${this.currentWinner.name} eliminado por ausencia`);
   }
 
-  // Devolver el premio AL INICIO de la lista para que sea el siguiente en sortearse
+  // Devolver el premio a la lista (en una posición aleatoria para mantener aleatoriedad)
   if (this.currentPrize) {
-    this.prizes.unshift(this.currentPrize); // unshift lo pone al inicio
-    console.log(`Premio "${this.currentPrize.name}" puesto como siguiente a sortear`);
+    this.prizes.push(this.currentPrize); // Agregar de vuelta a la lista
+    console.log(`Premio "${this.currentPrize.name}" devuelto para re-sorteo aleatorio`);
   }
 
   // Limpiar ganador y premio actuales

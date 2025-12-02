@@ -20,24 +20,24 @@ export class MathUtils {
 
   // Calcular rotación final de la ruleta
   public static calculateRouletteRotation(
-    winnerIndex: number, 
-    totalParticipants: number, 
+    winnerIndex: number,
+    totalParticipants: number,
     baseSpins: number = 3
   ): number {
     if (totalParticipants === 0) return 0;
-    
+
     // Ángulo por participante
     const anglePerParticipant = (2 * Math.PI) / totalParticipants;
-    
+
     // Ángulo del ganador (invertido para compensar rotación clockwise)
     const winnerAngle = (totalParticipants - winnerIndex) * anglePerParticipant;
-    
+
     // Rotación base (varias vueltas)
     const baseRotation = baseSpins * 2 * Math.PI;
-    
+
     // Variación aleatoria para naturalidad
     const randomVariation = (Math.random() - 0.5) * 0.3;
-    
+
     return baseRotation + winnerAngle + randomVariation;
   }
 
