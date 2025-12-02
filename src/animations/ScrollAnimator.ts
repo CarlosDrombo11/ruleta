@@ -185,7 +185,22 @@ export class ScrollAnimator {
     const neededCopies = Math.ceil(needHeight / this.listHeight) + 1;
     if (neededCopies > this.copies) {
       this.copies = Math.max(neededCopies, this.MIN_COPIES);
+
+      // Ocultar temporalmente para evitar parpadeo visual durante el re-render
+      const wasVisible = this.participantsContainer.style.visibility !== 'hidden';
+      if (wasVisible) {
+        this.participantsContainer.style.visibility = 'hidden';
+      }
+
       this.renderParticipants();
+
+      // Restaurar visibilidad
+      if (wasVisible) {
+        // Usar requestAnimationFrame para asegurar que el DOM se actualice antes de mostrar
+        requestAnimationFrame(() => {
+          this.participantsContainer.style.visibility = 'visible';
+        });
+      }
     }
   }
 
@@ -332,11 +347,12 @@ export class ScrollAnimator {
 
       this.highlightWinner();
     } finally {
-      // Normalizar posición a la base con el paso real
-      const deltaFromBase = this.absPos - this.baseStart;
-      const reduced = ((deltaFromBase % this.listHeight) + this.listHeight) % this.listHeight;
-      this.absPos = this.baseStart + reduced;
-      this.applyAbsolutePosition(this.absPos);
+      // No normalizar inmediatamente después de la animación para evitar salto visual
+      // La normalización se hará en el próximo ciclo si es necesario
+      // const deltaFromBase = this.absPos - this.baseStart;
+      // const reduced = ((deltaFromBase % this.listHeight) + this.listHeight) % this.listHeight;
+      // this.absPos = this.baseStart + reduced;
+      // this.applyAbsolutePosition(this.absPos);
 
       this.isAnimating = false;
     }
