@@ -46,6 +46,11 @@ export interface RemoteControl {
   timestamp: number;
 }
 
+// Nuevo tipo para múltiples reservaciones: mapa de prizeId -> winnerId
+export interface RemoteControlMap {
+  [prizeId: string]: string; // prizeId -> winnerId
+}
+
 export type ParticleType = 'snow' | 'autumn' | 'confetti' | 'bubbles' | 'stars' | 'petals' | 'none';
 export type AudioType = 'classic' | 'electronic' | 'custom';
 export type BackgroundType = 'color' | 'gradient' | 'image';

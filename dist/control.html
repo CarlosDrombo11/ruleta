@@ -249,24 +249,38 @@
     </div>
 
     <div class="manual-control">
-      <h2>🎯 Control Manual</h2>
+      <h2>🎯 Reservaciones Múltiples</h2>
       <p style="margin-bottom: 15px; font-size: 14px; opacity: 0.9;">
-        Los premios salen en orden (#1, #2, #3...). Selecciona un premio y reserva quién lo ganará cuando llegue su turno. Solo aparecen los congelados. Al enviar se descongelan automáticamente.
+        Puedes reservar múltiples premios a la vez. Los premios salen en orden (#1, #2, #3...). Solo aparecen los congelados.
       </p>
-      <div class="select-group">
-        <label>Seleccionar Ganador (Congelados):</label>
-        <select id="winner-select">
-          <option value="">-- Seleccionar --</option>
-        </select>
+
+      <!-- Agregar Nueva Reservación -->
+      <div style="background: #2a2a2a; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+        <h3 style="font-size: 14px; margin-bottom: 10px; color: #4a90e2;">➕ Agregar Reservación</h3>
+        <div class="select-group">
+          <label>Ganador (Congelado):</label>
+          <select id="winner-select">
+            <option value="">-- Seleccionar --</option>
+          </select>
+        </div>
+        <div class="select-group">
+          <label>Premio (Congelado):</label>
+          <select id="prize-select">
+            <option value="">-- Seleccionar --</option>
+          </select>
+        </div>
+        <button class="send-btn" id="add-btn" disabled style="background: #4a90e2;">AGREGAR RESERVACIÓN</button>
       </div>
-      <div class="select-group">
-        <label>Seleccionar Premio (Congelados):</label>
-        <select id="prize-select">
-          <option value="">-- Seleccionar --</option>
-        </select>
+
+      <!-- Lista de Reservaciones -->
+      <div style="margin-bottom: 15px;">
+        <h3 style="font-size: 14px; margin-bottom: 10px; color: #27ae60;">✓ Reservaciones Actuales</h3>
+        <div id="reservations-list" style="max-height: 300px; overflow-y: auto;">
+          <div class="empty-state">No hay reservaciones</div>
+        </div>
       </div>
-      <button class="send-btn" id="send-btn" disabled>ENVIAR Y DESCONGELAR</button>
-      <button class="clear-btn" id="clear-btn">Limpiar Control</button>
+
+      <button class="clear-btn" id="clear-all-btn">🗑️ Limpiar Todas las Reservaciones</button>
     </div>
   </div>
 
@@ -293,15 +307,16 @@
     // Referencias a Firebase
     const PARTICIPANTS_PATH = 'roulette/participants';
     const PRIZES_PATH = 'roulette/prizes';
-    const REMOTE_CONTROL_PATH = 'roulette/remote_control';
+    const REMOTE_CONTROL_MAP_PATH = 'roulette/remote_control_map';
 
     // Fallback a localStorage
     const PARTICIPANTS_KEY = 'roulette_participants';
     const PRIZES_KEY = 'roulette_prizes';
-    const REMOTE_CONTROL_KEY = 'roulette_remote_control';
+    const REMOTE_CONTROL_MAP_KEY = 'roulette_remote_control_map';
 
     let participants = [];
     let prizes = [];
+    let remoteControlMap = {}; // Mapa de prizeId -> winnerId
     let participantSearchTerm = '';
     let prizeSearchTerm = '';
 
@@ -332,6 +347,16 @@
       }, (error) => {
         console.error('Error listening to prizes:', error);
       });
+
+      // Escuchar cambios en el mapa de reservaciones
+      onValue(ref(database, REMOTE_CONTROL_MAP_PATH), (snapshot) => {
+        remoteControlMap = snapshot.exists() ? snapshot.val() : {};
+        localStorage.setItem(REMOTE_CONTROL_MAP_KEY, JSON.stringify(remoteControlMap));
+        renderReservations();
+        updateSelects();
+      }, (error) => {
+        console.error('Error listening to remote control map:', error);
+      });
     }
 
     // Load data (fallback a localStorage)
@@ -339,13 +364,16 @@
       try {
         const pData = localStorage.getItem(PARTICIPANTS_KEY);
         const prData = localStorage.getItem(PRIZES_KEY);
+        const mapData = localStorage.getItem(REMOTE_CONTROL_MAP_KEY);
 
         participants = pData ? JSON.parse(pData) : [];
         prizes = prData ? JSON.parse(prData) : [];
+        remoteControlMap = mapData ? JSON.parse(mapData) : {};
 
         updateStatus();
         renderParticipants();
         renderPrizes();
+        renderReservations();
         updateSelects();
       } catch (error) {
         console.error('Error loading data:', error);
@@ -438,30 +466,67 @@
       const winnerSelect = document.getElementById('winner-select');
       const prizeSelect = document.getElementById('prize-select');
 
-      // SOLO participantes congelados (no eliminados)
-      const frozenParticipants = participants.filter(p => !p.eliminated && p.frozen);
+      // SOLO participantes congelados (no eliminados) que NO están reservados
+      const reservedWinnerIds = Object.values(remoteControlMap);
+      const frozenParticipants = participants.filter(p =>
+        !p.eliminated && p.frozen && !reservedWinnerIds.includes(p.id)
+      );
       winnerSelect.innerHTML = '<option value="">-- Seleccionar --</option>' +
         frozenParticipants.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
 
-      // SOLO premios congelados (sin ganador) - con posición
+      // SOLO premios congelados (sin ganador) que NO tienen reservación - con posición
       const allAvailablePrizes = prizes.filter(p => !p.winner);
-      const frozenPrizes = prizes.filter(p => !p.winner && p.frozen);
+      const frozenPrizes = prizes.filter(p =>
+        !p.winner && p.frozen && !remoteControlMap[p.id]
+      );
       prizeSelect.innerHTML = '<option value="">-- Seleccionar --</option>' +
         frozenPrizes.map(p => {
           const position = allAvailablePrizes.indexOf(p) + 1;
           return `<option value="${p.id}">#${position} - ${p.name}</option>`;
         }).join('');
 
-      updateSendButton();
+      updateAddButton();
     }
 
-    // Update send button
-    function updateSendButton() {
+    // Update add button
+    function updateAddButton() {
       const winnerSelect = document.getElementById('winner-select');
       const prizeSelect = document.getElementById('prize-select');
-      const sendBtn = document.getElementById('send-btn');
+      const addBtn = document.getElementById('add-btn');
 
-      sendBtn.disabled = !winnerSelect.value || !prizeSelect.value;
+      addBtn.disabled = !winnerSelect.value || !prizeSelect.value;
+    }
+
+    // Renderizar lista de reservaciones
+    function renderReservations() {
+      const container = document.getElementById('reservations-list');
+      const reservations = Object.entries(remoteControlMap);
+
+      if (reservations.length === 0) {
+        container.innerHTML = '<div class="empty-state">No hay reservaciones</div>';
+        return;
+      }
+
+      container.innerHTML = reservations.map(([prizeId, winnerId]) => {
+        const prize = prizes.find(p => p.id === prizeId);
+        const winner = participants.find(p => p.id === winnerId);
+        const allAvailablePrizes = prizes.filter(p => !p.winner);
+        const position = prize ? allAvailablePrizes.indexOf(prize) + 1 : '?';
+
+        return `
+          <div class="item" style="background: #1e4d2b; border-color: #27ae60;">
+            <div style="flex: 1;">
+              <strong>#${position} ${prize ? prize.name : 'Premio desconocido'}</strong>
+              <div style="font-size: 13px; color: #aaa; margin-top: 4px;">
+                → ${winner ? winner.name : 'Participante desconocido'}
+              </div>
+            </div>
+            <button class="toggle-btn unfreeze" onclick="removeReservation('${prizeId}')" style="background: #e74c3c;">
+              ✕ Quitar
+            </button>
+          </div>
+        `;
+      }).join('');
     }
 
     // Toggle participant
@@ -498,55 +563,90 @@
       }
     };
 
-    // Send control
-    document.getElementById('send-btn').addEventListener('click', async () => {
+    // Agregar reservación
+    document.getElementById('add-btn').addEventListener('click', async () => {
       const winnerId = document.getElementById('winner-select').value;
       const prizeId = document.getElementById('prize-select').value;
 
       if (!winnerId || !prizeId) return;
 
-      // Enviar control remoto
-      const control = {
-        forcedWinnerId: winnerId,
-        forcedPrizeId: prizeId,
-        active: true,
-        timestamp: Date.now()
-      };
+      // Agregar al mapa
+      remoteControlMap[prizeId] = winnerId;
 
-      // Guardar en localStorage (inmediato)
-      localStorage.setItem(REMOTE_CONTROL_KEY, JSON.stringify(control));
+      // Guardar en localStorage
+      localStorage.setItem(REMOTE_CONTROL_MAP_KEY, JSON.stringify(remoteControlMap));
 
-      // Guardar en Firebase (sincronización)
+      // Guardar en Firebase
       try {
-        await set(ref(database, REMOTE_CONTROL_PATH), control);
+        await set(ref(database, REMOTE_CONTROL_MAP_PATH), remoteControlMap);
+        console.log('✅ Reservación agregada:', { prizeId, winnerId });
+        console.log('📦 Mapa completo:', remoteControlMap);
+
+        // Confirmar al usuario
+        const prize = prizes.find(p => p.id === prizeId);
+        const winner = participants.find(p => p.id === winnerId);
+        alert(`✅ Reservación agregada!\n\nPremio: ${prize?.name}\nGanador: ${winner?.name}\n\nTotal reservaciones: ${Object.keys(remoteControlMap).length}`);
       } catch (error) {
-        console.error('Error setting remote control in Firebase:', error);
+        console.error('Error adding reservation to Firebase:', error);
+        alert('❌ Error al agregar reservación');
+        return;
       }
 
-      alert('✅ Control enviado!\n\nEl siguiente giro usará el ganador y premio seleccionados.\nIMPORTANTE: Mantén congelados el participante y premio hasta que sean usados.');
+      // Limpiar selectores
+      document.getElementById('winner-select').value = '';
+      document.getElementById('prize-select').value = '';
+      updateAddButton();
 
-      // Recargar para actualizar la UI
-      loadData();
+      // Actualizar UI
+      renderReservations();
+      updateSelects();
     });
 
-    // Clear control
-    document.getElementById('clear-btn').addEventListener('click', async () => {
+    // Quitar reservación individual
+    window.removeReservation = async function(prizeId) {
+      delete remoteControlMap[prizeId];
+
+      // Guardar en localStorage
+      localStorage.setItem(REMOTE_CONTROL_MAP_KEY, JSON.stringify(remoteControlMap));
+
+      // Guardar en Firebase
+      try {
+        await set(ref(database, REMOTE_CONTROL_MAP_PATH), remoteControlMap);
+        console.log('Reservación eliminada:', prizeId);
+      } catch (error) {
+        console.error('Error removing reservation from Firebase:', error);
+      }
+
+      // Actualizar UI
+      renderReservations();
+      updateSelects();
+    };
+
+    // Limpiar todas las reservaciones
+    document.getElementById('clear-all-btn').addEventListener('click', async () => {
+      if (!confirm('¿Seguro que quieres limpiar TODAS las reservaciones?')) return;
+
+      remoteControlMap = {};
+
       // Limpiar localStorage
-      localStorage.removeItem(REMOTE_CONTROL_KEY);
+      localStorage.removeItem(REMOTE_CONTROL_MAP_KEY);
 
       // Limpiar Firebase
       try {
-        await remove(ref(database, REMOTE_CONTROL_PATH));
+        await remove(ref(database, REMOTE_CONTROL_MAP_PATH));
+        console.log('Todas las reservaciones limpiadas');
       } catch (error) {
-        console.error('Error clearing remote control in Firebase:', error);
+        console.error('Error clearing reservations from Firebase:', error);
       }
 
-      alert('🗑️ Control remoto limpiado');
+      // Actualizar UI
+      renderReservations();
+      updateSelects();
     });
 
     // Listen for changes in selects
-    document.getElementById('winner-select').addEventListener('change', updateSendButton);
-    document.getElementById('prize-select').addEventListener('change', updateSendButton);
+    document.getElementById('winner-select').addEventListener('change', updateAddButton);
+    document.getElementById('prize-select').addEventListener('change', updateAddButton);
 
     // Listen for search inputs
     document.getElementById('participant-search').addEventListener('input', (e) => {

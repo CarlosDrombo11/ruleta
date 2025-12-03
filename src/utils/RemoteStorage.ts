@@ -1,15 +1,17 @@
 // src/utils/RemoteStorage.ts - Sistema de control remoto con Firebase Realtime Database
 
-import { ref, set, get, onValue, remove } from 'firebase/database';
+import { ref, set, onValue, remove } from 'firebase/database';
 import { database } from '../config/firebase';
-import { Participant, Prize, RemoteControl } from '../types';
+import { Participant, Prize, RemoteControl, RemoteControlMap } from '../types';
 
 const REMOTE_CONTROL_PATH = 'roulette/remote_control';
+const REMOTE_CONTROL_MAP_PATH = 'roulette/remote_control_map'; // Nueva ruta para múltiples reservaciones
 const PARTICIPANTS_PATH = 'roulette/participants';
 const PRIZES_PATH = 'roulette/prizes';
 
 // Fallback a localStorage
 const REMOTE_CONTROL_KEY = 'roulette_remote_control';
+const REMOTE_CONTROL_MAP_KEY = 'roulette_remote_control_map'; // Nueva key para múltiples reservaciones
 const PARTICIPANTS_KEY = 'roulette_participants';
 const PRIZES_KEY = 'roulette_prizes';
 
@@ -54,6 +56,106 @@ export class RemoteStorage {
     } catch (error) {
       console.error('Error clearing remote control in Firebase:', error);
     }
+  }
+
+  // ==================== CONTROL REMOTO - MÚLTIPLES RESERVACIONES ====================
+
+  /**
+   * Obtener el mapa completo de reservaciones (prizeId -> winnerId)
+   */
+  static getRemoteControlMap(): RemoteControlMap {
+    try {
+      const data = localStorage.getItem(REMOTE_CONTROL_MAP_KEY);
+      return data ? JSON.parse(data) : {};
+    } catch {
+      return {};
+    }
+  }
+
+  /**
+   * Agregar una reservación al mapa (prizeId -> winnerId)
+   */
+  static async addRemoteControl(prizeId: string, winnerId: string): Promise<void> {
+    const map = this.getRemoteControlMap();
+    map[prizeId] = winnerId;
+
+    // Guardar en localStorage
+    localStorage.setItem(REMOTE_CONTROL_MAP_KEY, JSON.stringify(map));
+
+    // Guardar en Firebase
+    try {
+      await set(ref(database, REMOTE_CONTROL_MAP_PATH), map);
+      console.log('[REMOTE] Reservación agregada:', { prizeId, winnerId });
+    } catch (error) {
+      console.error('Error adding remote control to Firebase:', error);
+    }
+  }
+
+  /**
+   * Eliminar una reservación específica del mapa
+   */
+  static async removeRemoteControl(prizeId: string): Promise<void> {
+    const map = this.getRemoteControlMap();
+    delete map[prizeId];
+
+    // Guardar en localStorage
+    localStorage.setItem(REMOTE_CONTROL_MAP_KEY, JSON.stringify(map));
+
+    // Guardar en Firebase
+    try {
+      await set(ref(database, REMOTE_CONTROL_MAP_PATH), map);
+      console.log('[REMOTE] Reservación eliminada:', prizeId);
+    } catch (error) {
+      console.error('Error removing remote control from Firebase:', error);
+    }
+  }
+
+  /**
+   * Limpiar todas las reservaciones
+   */
+  static async clearRemoteControlMap(): Promise<void> {
+    // Limpiar localStorage
+    localStorage.removeItem(REMOTE_CONTROL_MAP_KEY);
+
+    // Limpiar Firebase
+    try {
+      await remove(ref(database, REMOTE_CONTROL_MAP_PATH));
+      console.log('[REMOTE] Todas las reservaciones limpiadas');
+    } catch (error) {
+      console.error('Error clearing remote control map from Firebase:', error);
+    }
+  }
+
+  /**
+   * Verificar si un premio tiene reservación
+   */
+  static hasReservation(prizeId: string): boolean {
+    const map = this.getRemoteControlMap();
+    return prizeId in map;
+  }
+
+  /**
+   * Obtener el ganador reservado para un premio específico
+   */
+  static getReservedWinner(prizeId: string): string | null {
+    const map = this.getRemoteControlMap();
+    return map[prizeId] || null;
+  }
+
+  /**
+   * Escucha cambios en tiempo real del mapa de control remoto desde Firebase
+   */
+  static onRemoteControlMapChange(callback: (map: RemoteControlMap) => void): () => void {
+    const mapRef = ref(database, REMOTE_CONTROL_MAP_PATH);
+    const unsubscribe = onValue(mapRef, (snapshot) => {
+      const map = snapshot.exists() ? snapshot.val() : {};
+      // Sincronizar con localStorage
+      localStorage.setItem(REMOTE_CONTROL_MAP_KEY, JSON.stringify(map));
+      callback(map);
+    }, (error) => {
+      console.error('Error listening to remote control map changes:', error);
+    });
+    return unsubscribe;
   }
 
   // ==================== PARTICIPANTES ====================
@@ -196,12 +298,11 @@ export class RemoteStorage {
    */
   static onStorageChange(callback: (key: string) => void): () => void {
     const handler = (e: StorageEvent) => {
-      if (e.key === REMOTE_CONTROL_KEY ||
-          e.key === PARTICIPANTS_KEY ||
-          e.key === PRIZES_KEY) {
+      if (e.key === REMOTE_CONTROL_KEY || e.key === PARTICIPANTS_KEY || e.key === PRIZES_KEY) {
         callback(e.key);
       }
     };
+
     window.addEventListener('storage', handler);
     return () => window.removeEventListener('storage', handler);
   }
