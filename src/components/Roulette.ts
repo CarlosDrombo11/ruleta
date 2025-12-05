@@ -8,7 +8,6 @@ import { ExcelParser } from '../core/ExcelParser';
 import { ParticleSystem } from '../animations/ParticleSystem';
 import { ScrollAnimator } from '../animations/ScrollAnimator';
 import { Storage } from '../utils/Storage';
-import { RemoteStorage } from '../utils/RemoteStorage';
 import { MathUtils } from '../utils/MathUtils';
 import { EventEmitter } from '../utils/EventEmitter';
 import {
@@ -204,8 +203,6 @@ export class Roulette extends EventEmitter {
     console.log('[INIT] Limpiando datos antiguos de sesión anterior');
     localStorage.removeItem('roulette_participants');
     localStorage.removeItem('roulette_prizes');
-    localStorage.removeItem('roulette_remote_control');
-    localStorage.removeItem('roulette_remote_control_map');
 
     console.time('[init] DOM');
     this.initializeDOM();
@@ -341,49 +338,6 @@ export class Roulette extends EventEmitter {
       if (excelFile) this.loadExcelFile(excelFile);
     });
 
-    // ✅ FIREBASE: Escuchar cambios en tiempo real de participantes
-    // Solo actualizar si YA hay datos cargados en esta sesión
-    RemoteStorage.onParticipantsChange((updatedParticipants) => {
-      // Solo sincronizar si ya tenemos datos cargados en ESTA sesión
-      if (this.dataLoadedInSession && updatedParticipants.length > 0) {
-        console.log('[FIREBASE] Participantes actualizados desde Firebase', updatedParticipants.length);
-        this.participants = updatedParticipants;
-        // Actualizar la UI del scroll animator si ya está inicializado
-        if (this.scrollAnimator) {
-          this.scrollAnimator.setParticipants(this.participants);
-        }
-      } else if (!this.dataLoadedInSession) {
-        console.log('[FIREBASE] Ignorando datos antiguos de Firebase al iniciar app');
-      }
-    });
-
-    // ✅ FIREBASE: Escuchar cambios en tiempo real de premios
-    // Solo actualizar si YA hay datos cargados en esta sesión
-    RemoteStorage.onPrizesChange((updatedPrizes) => {
-      // Solo sincronizar si ya tenemos datos cargados en ESTA sesión
-      if (this.dataLoadedInSession && updatedPrizes.length > 0) {
-        console.log('[FIREBASE] Premios actualizados desde Firebase', updatedPrizes.length);
-        this.prizes = updatedPrizes;
-        // Actualizar el estado de la máquina si hay/no premios
-        const prizesAvailable = updatedPrizes.filter(p => !p.winner).length > 0;
-        this.stateMachine.setPrizesAvailable(prizesAvailable);
-      } else if (!this.dataLoadedInSession) {
-        console.log('[FIREBASE] Ignorando datos antiguos de Firebase al iniciar app');
-      }
-    });
-
-    // ✅ FIREBASE: Escuchar cambios en el mapa de control remoto
-    RemoteStorage.onRemoteControlMapChange((map) => {
-      const count = Object.keys(map).length;
-      if (count > 0) {
-        console.log('[FIREBASE] Mapa de reservaciones actualizado desde Firebase', map);
-        console.log(`[FIREBASE] Total de reservaciones: ${count}`);
-      } else {
-        console.log('[FIREBASE] Mapa de reservaciones limpiado desde Firebase');
-      }
-    });
-
-    console.log('[FIREBASE] Listeners en tiempo real configurados');
   }
 
   private applyConfiguration(): void {
@@ -563,13 +517,6 @@ private applyBackground(): void {
 
     Storage.saveData(data);
 
-    // Limpiar control remoto anterior antes de cargar nuevos datos
-    await RemoteStorage.clearRemoteControl();
-
-    // Guardar en RemoteStorage para sincronización
-    await RemoteStorage.saveParticipants(this.participants);
-    await RemoteStorage.savePrizes(this.prizes);
-
     // ✅ Marcar que los datos fueron cargados en ESTA sesión
     this.dataLoadedInSession = true;
 
@@ -662,53 +609,20 @@ private applyBackground(): void {
       // MODO SECUENCIAL: Seleccionar premio y ganador respetando orden y control remoto
 
       // MODO SECUENCIAL: Siempre seleccionar el primer premio disponible (orden Excel)
-      // IMPORTANTE: Verificar control remoto ANTES de filtrar por congelado
-      const remoteControlMap = RemoteStorage.getRemoteControlMap();
-      console.log('[SPIN] 📋 Mapa de reservaciones:', remoteControlMap);
-      console.log('[SPIN] 🔢 Total de reservaciones:', Object.keys(remoteControlMap).length);
-      console.log('[SPIN] 🎁 IDs de premios reservados:', Object.keys(remoteControlMap));
+      const availablePrizes = this.prizes.filter(p => !p.winner);
 
-      // Buscar el primer premio que NO esté congelado O que tenga reservación en el mapa
-      let currentPrize: Prize | null = null;
-      for (const prize of this.prizes) {
-        console.log(`[SPIN] 🔍 Evaluando premio: ${prize.name} (id: ${prize.id}, frozen: ${prize.frozen}, winner: ${prize.winner ? 'SI' : 'NO'})`);
-
-        // Si el premio NO tiene ganador asignado aún
-        if (!prize.winner) {
-          // Si está congelado, solo lo usamos si tiene reservación en el mapa
-          if (prize.frozen) {
-            const hasRes = RemoteStorage.hasReservation(prize.id);
-            console.log(`[SPIN] ❄️ Premio congelado. ¿Tiene reservación? ${hasRes ? 'SÍ' : 'NO'}`);
-
-            if (hasRes) {
-              currentPrize = prize;
-              console.log('[SPIN] ✅ Premio congelado CON reservación', prize.name);
-              break;
-            } else {
-              console.log('[SPIN] ⏭️ Saltando premio congelado SIN reservación', prize.name);
-              continue; // Saltar este premio congelado
-            }
-          } else {
-            // Premio no congelado, lo usamos
-            currentPrize = prize;
-            console.log('[SPIN] ✅ Premio disponible (no congelado)', prize.name);
-            break;
-          }
-        } else {
-          console.log(`[SPIN] ⏭️ Premio ya tiene ganador, saltando`);
-        }
-      }
-
-      if (!currentPrize) {
+      if (availablePrizes.length === 0) {
         console.error('[SPIN] No hay premios disponibles');
         this.spinningGuard = false;
         return;
       }
 
-      this.currentPrize = currentPrize;
+      // Seleccionar el primer premio disponible en orden
+      this.currentPrize = availablePrizes[0];
+      console.log('[SPIN] Premio seleccionado:', this.currentPrize.name);
 
-      // Seleccionar ganador
-      const availableToSelect = availableParticipants.filter(p => !p.frozen);
+      // Seleccionar ganador - solo participantes no eliminados
+      const availableToSelect = availableParticipants;
 
       if (availableToSelect.length === 0) {
         console.error('[SPIN] No hay participantes disponibles (todos congelados)');
@@ -716,34 +630,12 @@ private applyBackground(): void {
         return;
       }
 
-      // Verificar si hay reservación para ESTE premio específico en el mapa
-      const reservedWinnerId = RemoteStorage.getReservedWinner(this.currentPrize.id);
-      if (reservedWinnerId) {
-        // CONTROL REMOTO: Este premio tiene un ganador reservado
-        const forcedWinner = this.participants.find(p => p.id === reservedWinnerId);
-
-        if (forcedWinner && !forcedWinner.eliminated) {
-          this.currentWinner = forcedWinner;
-          console.log('[SPIN] ⭐ CONTROL REMOTO - Ganador reservado para este premio', {
-            prize: this.currentPrize?.name,
-            winner: this.currentWinner?.name,
-            prizeId: this.currentPrize.id,
-            winnerId: reservedWinnerId
-          });
-          // Eliminar esta reservación específica del mapa después de usarla
-          await RemoteStorage.removeRemoteControl(this.currentPrize.id);
-        } else {
-          console.warn('[SPIN] Ganador reservado no válido, seleccionando aleatorio');
-          this.currentWinner = MathUtils.randomChoice(availableToSelect);
-        }
-      } else {
-        // Selección normal: ganador aleatorio
-        this.currentWinner = MathUtils.randomChoice(availableToSelect);
-        console.log('[SPIN] Selección secuencial (sin reservación)', {
-          prize: this.currentPrize?.name,
-          winner: this.currentWinner?.name
-        });
-      }
+      // Selección normal: ganador aleatorio
+      this.currentWinner = MathUtils.randomChoice(availableToSelect);
+      console.log('[SPIN] Selección aleatoria', {
+        prize: this.currentPrize?.name,
+        winner: this.currentWinner?.name
+      });
 
       // Mostrar premio en el centro
       this.canvasRenderer.setPrize(this.currentPrize.name, this.currentPrize.imageIndex);
